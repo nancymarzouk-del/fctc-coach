@@ -1,10 +1,12 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
-import { Flame, Award, TrendingUp, Clock, Flag, RotateCcw } from 'lucide-react'
+import { Flame, Award, TrendingUp, Clock, Flag, RotateCcw, LogOut } from 'lucide-react'
 
 const FCTC_COACH = () => {
-  const [currentPage, setCurrentPage] = useState('dashboard')
+  const [currentPage, setCurrentPage] = useState('login')
+  const [userName, setUserName] = useState('')
+  const [inputName, setInputName] = useState('')
   const [selectedMode, setSelectedMode] = useState(null)
   const [currentQuestion, setCurrentQuestion] = useState(0)
   const [score, setScore] = useState(0)
@@ -15,8 +17,24 @@ const FCTC_COACH = () => {
   const [timeLeft, setTimeLeft] = useState(null)
   const [timerActive, setTimerActive] = useState(false)
   const [sessionQuestions, setSessionQuestions] = useState([])
+  const [userStats, setUserStats] = useState({})
+  const [allUsers, setAllUsers] = useState([])
 
-  // Shuffle array function
+  useEffect(() => {
+    const savedUsers = JSON.parse(localStorage.getItem('fctcUsers') || '{}')
+    setAllUsers(Object.keys(savedUsers))
+    if (userName) {
+      setUserStats(savedUsers[userName] || { overall: 0, sessions: 0, hours: 0, categories: {} })
+    }
+  }, [userName])
+
+  const saveUserStats = (newStats) => {
+    const allUserData = JSON.parse(localStorage.getItem('fctcUsers') || '{}')
+    allUserData[userName] = newStats
+    localStorage.setItem('fctcUsers', JSON.stringify(allUserData))
+    setUserStats(newStats)
+  }
+
   const shuffleArray = (array) => {
     const shuffled = [...array]
     for (let i = shuffled.length - 1; i > 0; i--) {
@@ -24,17 +42,6 @@ const FCTC_COACH = () => {
       [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]]
     }
     return shuffled
-  }
-
-  // Shuffle answer options while tracking correct answer
-  const shuffleAnswers = (question) => {
-    const options = question.opts.map((opt, idx) => ({ text: opt, originalIdx: idx }))
-    const shuffled = shuffleArray(options)
-    const newCorrectIdx = shuffled.findIndex(opt => opt.originalIdx === question.correct)
-    return {
-      opts: shuffled.map(opt => opt.text),
-      correct: newCorrectIdx
-    }
   }
 
   const allQuestions = {
@@ -68,28 +75,9 @@ const FCTC_COACH = () => {
       { q: 'How many fixed pulleys are needed to gain mechanical advantage?', opts: ['One', 'Two', 'Three', 'Movable pulleys are needed'], correct: 3 },
       { q: 'What does a fixed pulley primarily provide?', opts: ['Mechanical advantage', 'Change of direction', 'Increased speed', 'Reduced weight'], correct: 1 },
       { q: 'In mechanical systems, what is lubrication used for?', opts: ['Increase weight', 'Reduce friction', 'Increase speed', 'Prevent rust'], correct: 1 },
-      { q: 'A pencil sharpener uses which type of simple machine?', opts: ['Pulley', 'Screw', 'Wheel and axle', 'Lever'], correct: 2 },
-      { q: 'When force is applied to a longer lever arm, the result is:', opts: ['Greater force on the load', 'Lesser force needed on effort', 'No change in force', 'Load moves faster'], correct: 1 },
-      { q: 'What is the ideal mechanical advantage of a ramp 40 feet long and 8 feet high?', opts: ['5', '8', '32', '48'], correct: 0 },
-      { q: 'A nutcracker operates as which class of lever?', opts: ['First class', 'Second class', 'Third class', 'Not a lever'], correct: 1 },
-      { q: 'In a pulley system, what does "movable" pulley mean?', opts: ['It can change direction', 'It moves with the load', 'It is manually controlled', 'It reduces friction'], correct: 1 },
-      { q: 'Which simple machine converts rotational motion to linear motion?', opts: ['Lever', 'Screw', 'Pulley', 'Wheel and axle'], correct: 1 },
-      { q: 'What is the relationship between effort distance and load distance in a lever?', opts: ['They are always equal', 'They are inversely related to forces', 'They are the same', 'They are unrelated'], correct: 1 },
-      { q: 'A bicycle chain and sprocket system is which type of simple machine?', opts: ['Lever', 'Pulley', 'Wheel and axle', 'Screw'], correct: 2 },
-      { q: 'How does a ramp make it easier to move objects?', opts: ['Reduces the distance traveled', 'Reduces the force needed', 'Eliminates friction', 'Increases speed'], correct: 1 },
-      { q: 'In a third-class lever, where is the effort applied?', opts: ['At one end', 'Between fulcrum and load', 'Under the load', 'Always at the fulcrum'], correct: 1 },
-      { q: 'What principle allows pulleys to provide mechanical advantage?', opts: ['Momentum', 'Tension distribution', 'Gravity reduction', 'Energy conservation'], correct: 1 },
-      { q: 'A scissors is an example of which class of lever?', opts: ['First class', 'Second class', 'Third class', 'Not a lever'], correct: 0 },
-      { q: 'When two gears mesh, what happens to their speeds?', opts: ['Both move at same speed', 'They move inversely', 'The larger moves faster', 'Speed is not affected'], correct: 1 },
-      { q: 'What does an ideal simple machine do?', opts: ['Eliminates friction', 'Conserves energy', 'Increases work output', 'Reduces input force'], correct: 1 },
-      { q: 'A fishing rod is primarily which type of simple machine?', opts: ['Lever', 'Pulley', 'Wheel and axle', 'Inclined plane'], correct: 0 },
-      { q: 'In a mechanical system, what is load?', opts: ['The effort applied', 'The resistance overcome', 'The friction present', 'The speed of movement'], correct: 1 },
-      { q: 'What happens when you increase the number of supporting ropes in a pulley system?', opts: ['Load increases', 'Mechanical advantage increases', 'Force needed increases', 'Distance increases'], correct: 1 },
-      { q: 'A stapler uses which simple machine principle?', opts: ['Pulley', 'Lever and wedge', 'Screw', 'Wheel and axle'], correct: 1 },
-      { q: 'Which factor does NOT affect mechanical advantage of an inclined plane?', opts: ['Height', 'Length', 'Angle', 'Color'], correct: 3 },
-      { q: 'In an ideal pulley system with 50% efficiency, what does this mean?', opts: ['50% of effort is wasted', 'Half the force is lost to friction', 'Only 50% of input becomes useful work', 'All of the above'], correct: 3 }
+      { q: 'A pencil sharpener uses which type of simple machine?', opts: ['Pulley', 'Screw', 'Wheel and axle', 'Lever'], correct: 2 }
     ],
-    
+
     mathematics: [
       { q: 'If a fire truck travels 60 miles in 1 hour, how far will it travel in 2.5 hours?', opts: ['120 miles', '150 miles', '180 miles', '200 miles'], correct: 1 },
       { q: 'A water tank holds 5,000 gallons. If it drains at 250 gallons per minute, how many minutes to empty?', opts: ['10 minutes', '15 minutes', '20 minutes', '25 minutes'], correct: 2 },
@@ -120,19 +108,7 @@ const FCTC_COACH = () => {
       { q: 'What is 33% of 300?', opts: ['99', '100', '110', '120'], correct: 0 },
       { q: 'If a truck uses 5 gallons of fuel per 20 miles, how much for 100 miles?', opts: ['10 gallons', '15 gallons', '20 gallons', '25 gallons'], correct: 1 },
       { q: 'A circular tank has radius 10 feet. What is its area? (Use π ≈ 3.14)', opts: ['31.4 sq ft', '62.8 sq ft', '314 sq ft', '628 sq ft'], correct: 2 },
-      { q: 'If equipment costs $10,000 and you need 6 of them, what is total cost?', opts: ['$40,000', '$50,000', '$60,000', '$70,000'], correct: 2 },
-      { q: 'What is 7 squared?', opts: ['42', '49', '56', '63'], correct: 1 },
-      { q: 'If a pump delivers 300 GPM, how many gallons in 45 minutes?', opts: ['6,750', '9,000', '13,500', '15,000'], correct: 2 },
-      { q: 'Convert 100°F to Celsius:', opts: ['32°C', '37.7°C', '42°C', '50°C'], correct: 1 },
-      { q: 'What percent increase is going from 50 to 75?', opts: ['25%', '33%', '50%', '75%'], correct: 2 },
-      { q: 'A cylindrical tank is 20 feet tall and 6 feet in diameter. Volume? (π ≈ 3.14)', opts: ['188 cubic ft', '376 cubic ft', '565 cubic ft', '2260 cubic ft'], correct: 2 },
-      { q: 'If 10 workers complete a job in 8 hours, how long for 4 workers?', opts: ['3.2 hours', '8 hours', '20 hours', '32 hours'], correct: 3 },
-      { q: 'What is 60% of 150?', opts: ['60', '80', '90', '110'], correct: 2 },
-      { q: 'If pressure increases from 50 PSI to 75 PSI, what is percent increase?', opts: ['25%', '33%', '50%', '75%'], correct: 2 },
-      { q: 'A ladder is 30 feet long. If it touches the wall 24 feet up, how far from the wall?', opts: ['6 feet', '12 feet', '18 feet', '24 feet'], correct: 1 },
-      { q: 'What is the cube of 3?', opts: ['6', '9', '27', '81'], correct: 2 },
-      { q: 'If a tank drains from 800 gallons to 200 gallons in 15 minutes, what is drain rate?', opts: ['20 GPM', '30 GPM', '40 GPM', '50 GPM'], correct: 2 },
-      { q: 'Convert -40°C to Fahrenheit:', opts: ['-40°F', '-20°F', '0°F', '32°F'], correct: 0 }
+      { q: 'If equipment costs $10,000 and you need 6 of them, what is total cost?', opts: ['$40,000', '$50,000', '$60,000', '$70,000'], correct: 2 }
     ],
 
     readingComprehension: [
@@ -165,11 +141,7 @@ const FCTC_COACH = () => {
       { q: 'What is "mutual aid" in firefighting?', opts: ['Helping each other', 'Other agencies assisting during emergencies', 'Mandatory help', 'Voluntary program'], correct: 1 },
       { q: 'How do firefighters identify building exits?', opts: ['By looking', 'Through systematic floor searches and prior knowledge', 'From memory', 'By asking residents'], correct: 1 },
       { q: 'What is a "scene size-up"?', opts: ['Looking at fire size', 'Initial assessment of incident conditions and hazards', 'Taking photographs', 'Talking to neighbors'], correct: 1 },
-      { q: 'Why is it important to test equipment regularly?', opts: ['Keeps it clean', 'Ensures it functions properly in emergencies', 'Uses budget', 'Keeps everyone busy'], correct: 1 },
-      { q: 'What does "incident command" establish?', opts: ['Who is in charge and organized structure', 'Building commands', 'Radio frequency', 'Time schedule'], correct: 0 },
-      { q: 'In medical response, what is "triage"?', opts: ['Type of bandage', 'Sorting patients by injury severity', 'Medical equipment', 'Hospital procedure'], correct: 1 },
-      { q: 'How should firefighters handle hazardous materials?', opts: ['Carefully', 'With proper training, equipment, and procedures', 'Only if trained', 'Quickly'], correct: 1 },
-      { q: 'What is the purpose of "after-action reports"?', opts: ['Blaming people', 'Learning from incidents to improve operations', 'Punishment', 'Checking work'], correct: 1 }
+      { q: 'Why is it important to test equipment regularly?', opts: ['Keeps it clean', 'Ensures it functions properly in emergencies', 'Uses budget', 'Keeps everyone busy'], correct: 1 }
     ],
 
     memoryRecall: [
@@ -202,9 +174,7 @@ const FCTC_COACH = () => {
       { q: 'How many personnel conducted initial assessment?', opts: ['1', '2', '3', '4'], correct: 1 },
       { q: 'Was the area fully evacuated?', opts: ['No', 'Partially', 'Completely', 'Unsure'], correct: 2 },
       { q: 'What type of ladder was used?', opts: ['Aluminum', 'Fiberglass', 'Wooden', 'Extension'], correct: 3 },
-      { q: 'How long was the initial scene assessment?', opts: ['2 min', '5 min', '8 min', '10 min'], correct: 2 },
-      { q: 'Were all hazards immediately controlled?', opts: ['Yes', 'Partially', 'No', 'Not shown'], correct: 1 },
-      { q: 'What was the final action in the scenario?', opts: ['Departure', 'Report filed', 'Equipment packed', 'Debriefing'], correct: 2 }
+      { q: 'How long was the initial scene assessment?', opts: ['2 min', '5 min', '8 min', '10 min'], correct: 2 }
     ]
   }
 
@@ -236,20 +206,47 @@ const FCTC_COACH = () => {
     return () => clearInterval(timer)
   }, [timerActive, timeLeft])
 
+  const handleLogin = (e) => {
+    e.preventDefault()
+    if (inputName.trim()) {
+      setUserName(inputName)
+      setCurrentPage('dashboard')
+      const savedUsers = JSON.parse(localStorage.getItem('fctcUsers') || '{}')
+      if (!savedUsers[inputName]) {
+        savedUsers[inputName] = { overall: 0, sessions: 0, hours: 0, categories: {} }
+        localStorage.setItem('fctcUsers', JSON.stringify(savedUsers))
+      }
+      setAllUsers(Object.keys(savedUsers))
+    }
+  }
+
+  const handleLogout = () => {
+    setUserName('')
+    setInputName('')
+    setCurrentPage('login')
+  }
+
+  const resetScore = () => {
+    if (confirm('Are you sure you want to reset all scores?')) {
+      const resetStats = { overall: 0, sessions: 0, hours: 0, categories: {} }
+      saveUserStats(resetStats)
+    }
+  }
+
   const startPractice = (mode, category) => {
     const modeConfig = modes[mode]
     const allCategoryQuestions = allQuestions[category]
-    
-    // Shuffle and select random questions for this session
+
     const shuffled = shuffleArray(allCategoryQuestions)
     const selected = shuffled.slice(0, modeConfig.questions)
-    
-    // Shuffle answer options for each question
+
     const questionsWithShuffledAnswers = selected.map(q => {
-      const { opts, correct } = shuffleAnswers(q)
-      return { ...q, opts, correct }
+      const options = q.opts.map((opt, idx) => ({ text: opt, originalIdx: idx }))
+      const shuffledOpts = shuffleArray(options)
+      const newCorrectIdx = shuffledOpts.findIndex(opt => opt.originalIdx === q.correct)
+      return { ...q, opts: shuffledOpts.map(opt => opt.text), correct: newCorrectIdx }
     })
-    
+
     setSessionQuestions(questionsWithShuffledAnswers)
     setSelectedMode(mode)
     setSelectedCategory(category)
@@ -265,10 +262,10 @@ const FCTC_COACH = () => {
 
   const handleAnswer = (optionIndex) => {
     const isCorrect = sessionQuestions[currentQuestion].correct === optionIndex
-    
+
     setAnswered([...answered, { question: currentQuestion, answer: optionIndex, correct: isCorrect }])
     if (isCorrect) setScore(score + 1)
-    
+
     if (currentQuestion < sessionQuestions.length - 1) {
       setCurrentQuestion(currentQuestion + 1)
     } else {
@@ -293,15 +290,73 @@ const FCTC_COACH = () => {
     return `${mins}:${secs.toString().padStart(2, '0')}`
   }
 
+  if (currentPage === 'login') {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-red-50 to-gray-100 flex items-center justify-center p-4">
+        <div className="bg-white rounded-lg shadow-xl p-8 w-full max-w-md">
+          <div className="flex items-center gap-3 mb-6">
+            <Flame className="w-8 h-8 text-red-600" />
+            <h1 className="text-3xl font-bold text-gray-800">FCTC Pass Coach</h1>
+          </div>
+          <p className="text-gray-600 mb-6">California Firefighter Candidate Test Preparation</p>
+
+          <form onSubmit={handleLogin} className="mb-6">
+            <input
+              type="text"
+              placeholder="Enter your name"
+              value={inputName}
+              onChange={(e) => setInputName(e.target.value)}
+              className="w-full p-3 border-2 border-gray-300 rounded-lg mb-4 focus:border-red-600 focus:outline-none"
+            />
+            <button
+              type="submit"
+              className="w-full bg-red-600 text-white py-3 rounded-lg font-bold hover:bg-red-700 transition"
+            >
+              Start Studying
+            </button>
+          </form>
+
+          {allUsers.length > 0 && (
+            <div>
+              <p className="text-gray-700 font-bold mb-3">Previous Users:</p>
+              <div className="space-y-2">
+                {allUsers.map(user => (
+                  <button
+                    key={user}
+                    onClick={() => { setInputName(user); setUserName(user); setCurrentPage('dashboard') }}
+                    className="w-full bg-gray-100 p-3 rounded-lg text-left hover:bg-gray-200 transition"
+                  >
+                    {user}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    )
+  }
+
   if (currentPage === 'dashboard') {
     return (
       <div className="min-h-screen bg-gradient-to-br from-red-50 to-gray-100">
         <div className="bg-red-600 text-white p-6 shadow-lg">
-          <div className="max-w-7xl mx-auto flex items-center gap-3">
-            <Flame className="w-8 h-8" />
-            <h1 className="text-3xl font-bold">FCTC Pass Coach</h1>
+          <div className="max-w-7xl mx-auto flex justify-between items-center">
+            <div className="flex items-center gap-3">
+              <Flame className="w-8 h-8" />
+              <div>
+                <h1 className="text-3xl font-bold">FCTC Pass Coach</h1>
+                <p className="text-red-100">Welcome, {userName}!</p>
+              </div>
+            </div>
+            <button
+              onClick={handleLogout}
+              className="flex items-center gap-2 bg-red-700 hover:bg-red-800 px-4 py-2 rounded-lg transition"
+            >
+              <LogOut className="w-4 h-4" />
+              Switch User
+            </button>
           </div>
-          <p className="text-red-100 mt-2">California Firefighter Candidate Test Preparation</p>
         </div>
 
         <div className="max-w-7xl mx-auto p-6">
@@ -309,22 +364,27 @@ const FCTC_COACH = () => {
             <div className="bg-white p-6 rounded-lg shadow">
               <Award className="w-6 h-6 text-red-600 mb-2" />
               <p className="text-gray-600 text-sm">Overall Score</p>
-              <p className="text-3xl font-bold text-gray-800">78%</p>
+              <p className="text-3xl font-bold text-gray-800">{userStats.overall || 0}%</p>
             </div>
             <div className="bg-white p-6 rounded-lg shadow">
               <TrendingUp className="w-6 h-6 text-green-600 mb-2" />
-              <p className="text-gray-600 text-sm">This Week</p>
-              <p className="text-3xl font-bold text-green-600">+12%</p>
+              <p className="text-gray-600 text-sm">Sessions Completed</p>
+              <p className="text-3xl font-bold text-green-600">{userStats.sessions || 0}</p>
             </div>
             <div className="bg-white p-6 rounded-lg shadow">
               <Flame className="w-6 h-6 text-orange-600 mb-2" />
-              <p className="text-gray-600 text-sm">Streak</p>
-              <p className="text-3xl font-bold text-orange-600">7 days</p>
+              <p className="text-gray-600 text-sm">Study Hours</p>
+              <p className="text-3xl font-bold text-orange-600">{userStats.hours || 0}h</p>
             </div>
             <div className="bg-white p-6 rounded-lg shadow">
-              <Clock className="w-6 h-6 text-blue-600 mb-2" />
-              <p className="text-gray-600 text-sm">Study Hours</p>
-              <p className="text-3xl font-bold text-blue-600">24h</p>
+              <RotateCcw className="w-6 h-6 text-blue-600 mb-2" />
+              <p className="text-gray-600 text-sm">Actions</p>
+              <button
+                onClick={resetScore}
+                className="text-sm text-blue-600 hover:text-blue-800 font-bold mt-2"
+              >
+                Reset Scores
+              </button>
             </div>
           </div>
 
@@ -348,7 +408,7 @@ const FCTC_COACH = () => {
                 <div key={key} className={`${category.color} p-6 rounded-lg`}>
                   <p className="text-2xl mb-2">{category.icon}</p>
                   <h3 className={`font-bold ${category.textColor}`}>{category.name}</h3>
-                  <p className="text-gray-600 mt-2">Questions available</p>
+                  <p className="text-gray-600 mt-2">{userStats.categories?.[key]?.score || 0}%</p>
                 </div>
               ))}
             </div>
@@ -374,7 +434,7 @@ const FCTC_COACH = () => {
               <button key={key} onClick={() => startPractice(Object.keys(modes)[0], key)} className={`${category.color} p-8 rounded-lg text-left hover:shadow-lg transition border-l-4 border-gray-400`}>
                 <p className="text-5xl mb-4">{category.icon}</p>
                 <h3 className={`text-2xl font-bold ${category.textColor}`}>{category.name}</h3>
-                <p className="text-gray-600 mt-2">Multiple questions</p>
+                <p className="text-gray-600 mt-2">Random questions each time</p>
               </button>
             ))}
           </div>
