@@ -32,41 +32,6 @@ const FCTC_COACH = () => {
         { q: 'A wheel and axle has a wheel radius of 20 cm and axle radius of 5 cm. What is the mechanical advantage?', opts: ['2', '4', '15', '100'], correct: 1 },
         { q: 'Which type of lever has the load between the fulcrum and effort?', opts: ['First class', 'Second class', 'Third class', 'Fourth class'], correct: 1 },
         { q: 'A screw is essentially a(n):', opts: ['Inclined plane wrapped around a cylinder', 'Simple wedge', 'Rotating lever', 'Hydraulic system'], correct: 0 },
-cat > app/page.js << 'EOF'
-'use client'
-
-import React, { useState, useEffect } from 'react'
-import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
-import { Flame, BookOpen, Brain, Calculator, Eye, Award, TrendingUp, Clock, Flag, RotateCcw } from 'lucide-react'
-
-const FCTC_COACH = () => {
-  const [currentPage, setCurrentPage] = useState('dashboard')
-  const [selectedMode, setSelectedMode] = useState(null)
-  const [currentQuestion, setCurrentQuestion] = useState(0)
-  const [score, setScore] = useState(0)
-  const [answered, setAnswered] = useState([])
-  const [flagged, setFlagged] = useState(new Set())
-  const [showResults, setShowResults] = useState(false)
-  const [selectedCategory, setSelectedCategory] = useState(null)
-  const [progress, setProgress] = useState({})
-  const [timeLeft, setTimeLeft] = useState(null)
-  const [timerActive, setTimerActive] = useState(false)
-
-  const categories = {
-    mechanicalReasoning: {
-      name: 'Mechanical Reasoning',
-      icon: '⚙️',
-      color: 'bg-blue-100',
-      textColor: 'text-blue-700',
-      questions: [
-        { q: 'Which pulley system requires the least effort to lift a weight?', opts: ['Single fixed pulley', 'Double movable pulley', 'Single movable pulley', 'No pulley system'], correct: 1 },
-        { q: 'In a gear system, if the driving gear has 20 teeth and the driven gear has 40 teeth, what is the gear ratio?', opts: ['1:1', '1:2', '2:1', '1:4'], correct: 1 },
-        { q: 'A ladder leaning against a wall is most stable when the base is what distance from the wall?', opts: ['1/4 of ladder length', '1/3 of ladder length', '1/2 of ladder length', '2/3 of ladder length'], correct: 1 },
-        { q: 'Which type of inclined plane requires the least force to move an object up?', opts: ['Steep angle', 'Shallow angle', 'Vertical angle', 'All angles are equal'], correct: 1 },
-        { q: 'In a hydraulic system, if the input piston has an area of 10 cm² and the output piston has 100 cm², what is the mechanical advantage?', opts: ['1', '5', '10', '100'], correct: 2 },
-        { q: 'A wheel and axle has a wheel radius of 20 cm and axle radius of 5 cm. What is the mechanical advantage?', opts: ['2', '4', '15', '100'], correct: 1 },
-        { q: 'Which type of lever has the load between the fulcrum and effort?', opts: ['First class', 'Second class', 'Third class', 'Fourth class'], correct: 1 },
-        { q: 'A screw is essentially a(n):', opts: ['Inclined plane wrapped around a cylinder', 'Simple wedge', 'Rotating lever', 'Hydraulic system'], correct: 0 },
         { q: 'In a block and tackle system with 4 supporting ropes, the mechanical advantage is:', opts: ['2', '3', '4', '8'], correct: 2 },
         { q: 'Which pulley arrangement provides the greatest mechanical advantage?', opts: ['Single fixed pulley', 'Block and tackle with 6 ropes', 'Simple movable pulley', 'Rope and knot only'], correct: 1 }
       ]
