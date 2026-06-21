@@ -32,6 +32,41 @@ const FCTC_COACH = () => {
         { q: 'A wheel and axle has a wheel radius of 20 cm and axle radius of 5 cm. What is the mechanical advantage?', opts: ['2', '4', '15', '100'], correct: 1 },
         { q: 'Which type of lever has the load between the fulcrum and effort?', opts: ['First class', 'Second class', 'Third class', 'Fourth class'], correct: 1 },
         { q: 'A screw is essentially a(n):', opts: ['Inclined plane wrapped around a cylinder', 'Simple wedge', 'Rotating lever', 'Hydraulic system'], correct: 0 },
+cat > app/page.js << 'EOF'
+'use client'
+
+import React, { useState, useEffect } from 'react'
+import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
+import { Flame, BookOpen, Brain, Calculator, Eye, Award, TrendingUp, Clock, Flag, RotateCcw } from 'lucide-react'
+
+const FCTC_COACH = () => {
+  const [currentPage, setCurrentPage] = useState('dashboard')
+  const [selectedMode, setSelectedMode] = useState(null)
+  const [currentQuestion, setCurrentQuestion] = useState(0)
+  const [score, setScore] = useState(0)
+  const [answered, setAnswered] = useState([])
+  const [flagged, setFlagged] = useState(new Set())
+  const [showResults, setShowResults] = useState(false)
+  const [selectedCategory, setSelectedCategory] = useState(null)
+  const [progress, setProgress] = useState({})
+  const [timeLeft, setTimeLeft] = useState(null)
+  const [timerActive, setTimerActive] = useState(false)
+
+  const categories = {
+    mechanicalReasoning: {
+      name: 'Mechanical Reasoning',
+      icon: '⚙️',
+      color: 'bg-blue-100',
+      textColor: 'text-blue-700',
+      questions: [
+        { q: 'Which pulley system requires the least effort to lift a weight?', opts: ['Single fixed pulley', 'Double movable pulley', 'Single movable pulley', 'No pulley system'], correct: 1 },
+        { q: 'In a gear system, if the driving gear has 20 teeth and the driven gear has 40 teeth, what is the gear ratio?', opts: ['1:1', '1:2', '2:1', '1:4'], correct: 1 },
+        { q: 'A ladder leaning against a wall is most stable when the base is what distance from the wall?', opts: ['1/4 of ladder length', '1/3 of ladder length', '1/2 of ladder length', '2/3 of ladder length'], correct: 1 },
+        { q: 'Which type of inclined plane requires the least force to move an object up?', opts: ['Steep angle', 'Shallow angle', 'Vertical angle', 'All angles are equal'], correct: 1 },
+        { q: 'In a hydraulic system, if the input piston has an area of 10 cm² and the output piston has 100 cm², what is the mechanical advantage?', opts: ['1', '5', '10', '100'], correct: 2 },
+        { q: 'A wheel and axle has a wheel radius of 20 cm and axle radius of 5 cm. What is the mechanical advantage?', opts: ['2', '4', '15', '100'], correct: 1 },
+        { q: 'Which type of lever has the load between the fulcrum and effort?', opts: ['First class', 'Second class', 'Third class', 'Fourth class'], correct: 1 },
+        { q: 'A screw is essentially a(n):', opts: ['Inclined plane wrapped around a cylinder', 'Simple wedge', 'Rotating lever', 'Hydraulic system'], correct: 0 },
         { q: 'In a block and tackle system with 4 supporting ropes, the mechanical advantage is:', opts: ['2', '3', '4', '8'], correct: 2 },
         { q: 'Which pulley arrangement provides the greatest mechanical advantage?', opts: ['Single fixed pulley', 'Block and tackle with 6 ropes', 'Simple movable pulley', 'Rope and knot only'], correct: 1 }
       ]
@@ -98,7 +133,6 @@ const FCTC_COACH = () => {
     fullExam: { name: 'Full Exam', questions: 100, time: 180 }
   }
 
-  // Timer effect
   useEffect(() => {
     if (!timerActive || timeLeft === null) return
     const timer = setInterval(() => {
@@ -164,7 +198,6 @@ const FCTC_COACH = () => {
   if (currentPage === 'dashboard') {
     return (
       <div className="min-h-screen bg-gradient-to-br from-red-50 to-gray-100">
-        {/* Header */}
         <div className="bg-red-600 text-white p-6 shadow-lg">
           <div className="max-w-7xl mx-auto flex items-center gap-3">
             <Flame className="w-8 h-8" />
@@ -173,9 +206,7 @@ const FCTC_COACH = () => {
           <p className="text-red-100 mt-2">California Firefighter Candidate Test Preparation</p>
         </div>
 
-        {/* Main Content */}
         <div className="max-w-7xl mx-auto p-6">
-          {/* Quick Stats */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
             <div className="bg-white p-6 rounded-lg shadow">
               <Award className="w-6 h-6 text-red-600 mb-2" />
@@ -199,7 +230,6 @@ const FCTC_COACH = () => {
             </div>
           </div>
 
-          {/* Practice Modes */}
           <div className="mb-8">
             <h2 className="text-2xl font-bold text-gray-800 mb-4">Select Practice Mode</h2>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -217,7 +247,6 @@ const FCTC_COACH = () => {
             </div>
           </div>
 
-          {/* Categories Overview */}
           <div className="mb-8">
             <h2 className="text-2xl font-bold text-gray-800 mb-4">Category Performance</h2>
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -274,7 +303,6 @@ const FCTC_COACH = () => {
 
     return (
       <div className="min-h-screen bg-gradient-to-br from-red-50 to-gray-100">
-        {/* Header */}
         <div className="bg-red-600 text-white p-4 shadow-lg sticky top-0 z-50">
           <div className="max-w-7xl mx-auto flex justify-between items-center">
             <div>
@@ -288,7 +316,6 @@ const FCTC_COACH = () => {
           </div>
         </div>
 
-        {/* Question */}
         <div className="max-w-4xl mx-auto p-6">
           <div className="bg-white rounded-lg shadow-lg p-8 mb-6">
             <p className="text-xl font-bold text-gray-800 mb-6">{currentQ.q}</p>
@@ -333,7 +360,6 @@ const FCTC_COACH = () => {
         </div>
 
         <div className="max-w-4xl mx-auto p-6">
-          {/* Score Card */}
           <div className={`${isPassing ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'} border-2 rounded-lg p-8 mb-6 text-center`}>
             <p className="text-gray-600 mb-2">{categoryData.name} • {modeConfig.name}</p>
             <div className="text-6xl font-bold mb-4">
@@ -345,7 +371,6 @@ const FCTC_COACH = () => {
             </p>
           </div>
 
-          {/* Answer Review */}
           <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
             <h2 className="text-2xl font-bold text-gray-800 mb-4">Answer Review</h2>
             <div className="space-y-4 max-h-96 overflow-y-auto">
@@ -365,7 +390,6 @@ const FCTC_COACH = () => {
             </div>
           </div>
 
-          {/* Actions */}
           <div className="flex gap-4">
             <button
               onClick={() => setCurrentPage('dashboard')}
