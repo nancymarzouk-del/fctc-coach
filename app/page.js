@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef } from 'react'
 import {
   Flame, TrendingUp, Target, BookOpen, Wrench, Eye, Droplet, Wind,
   Users, Heart, CheckCircle2, XCircle, Lightbulb, Gauge, LogOut,
-  ChevronRight, RotateCcw, Truck, PlayCircle, Clock, AlertTriangle
+  ChevronRight, RotateCcw, Truck, PlayCircle, Clock, AlertTriangle, ClipboardList
 } from 'lucide-react'
 import { questionProvider, SUBSKILLS, makeRng } from '../lib/questionEngine'
 import {
@@ -13,7 +13,7 @@ import {
   weakAreas, buildTargetedSession, recommendations,
   commitSessionStats, categoryStats
 } from '../lib/learningEngine'
-import { generateScenario, generateRecallQuestions } from '../lib/recallScenario'
+import { generateScenario, generateBoard, generateRecallQuestions } from '../lib/recallScenario'
 
 const DOMAIN_ICONS = { mechanical: Wrench, math: TrendingUp, reading: BookOpen, recall: Eye }
 const DOMAIN_ACCENT = {
@@ -89,6 +89,9 @@ export default function App() {
   const startTargeted = () => startSession(buildTargetedSession(state, 10), 'Targeted Practice')
 
   const startDomain = (domain) => {
+    // Recall is always trained visually (study a board, then recall) — never
+    // as standalone text questions.
+    if (domain === 'recall') { startRecallDrill(); return }
     const subs = Object.keys(SUBSKILLS[domain].subskills)
     const plan = Array.from({ length: 10 }, (_, i) => {
       const sk = subs[i % subs.length]
@@ -100,6 +103,7 @@ export default function App() {
   const startDiagnostic = () => {
     const plan = []
     for (const d of Object.keys(SUBSKILLS)) {
+      if (d === 'recall') continue // recall is trained through the visual drill
       const subs = Object.keys(SUBSKILLS[d].subskills)
       for (let i = 0; i < 2; i++) plan.push({ domain: d, subskill: subs[i % subs.length], difficulty: 2 })
     }
@@ -132,13 +136,13 @@ export default function App() {
   }
 
   const startRecallDrill = () => {
-    const diff = state ? Math.max(1, Math.round(domainMastery(state, 'recall') * 4) + 1) : 2
-    const sc = generateScenario(Date.now(), Math.min(diff, 3))
+    const diff = state ? Math.max(1, Math.min(5, Math.round(domainMastery(state, 'recall') * 4) + 1)) : 2
+    const sc = generateBoard(Date.now(), diff)
     setScenario(sc)
     setSceneStep(0)
     setSceneProgress(0)
     setSceneTimeLeft(Math.round(sc.durationMs / 1000))
-    setSessionLabel('Video Recall Drill')
+    setSessionLabel('Visual Recall Drill')
     setPage('recallWatch')
   }
 
@@ -147,16 +151,14 @@ export default function App() {
     if (sceneTimer.current) clearInterval(sceneTimer.current)
     const TICK = 100
     let elapsed = 0
-    const perEvent = scenario.durationMs / (scenario.events.length + 1)
     sceneTimer.current = setInterval(() => {
       elapsed += TICK
       const p = Math.min(1, elapsed / scenario.durationMs)
       setSceneProgress(p)
       setSceneTimeLeft(Math.max(0, Math.ceil((scenario.durationMs - elapsed) / 1000)))
-      setSceneStep(Math.min(scenario.events.length, Math.floor(elapsed / perEvent)))
       if (elapsed >= scenario.durationMs) {
         clearInterval(sceneTimer.current)
-        const qs = generateRecallQuestions(scenario, Date.now(), 6)
+        const qs = generateRecallQuestions(scenario, Date.now(), Math.min(6, Math.max(4, scenario.detailCount - 1)))
         setQueue(qs); setQIndex(0); setSelected(null); setRevealed(false); setSessionLog([])
         setPage('recallQuiz')
       }
@@ -167,7 +169,7 @@ export default function App() {
 
   const skipToQuiz = () => {
     if (sceneTimer.current) clearInterval(sceneTimer.current)
-    const qs = generateRecallQuestions(scenario, Date.now(), 6)
+    const qs = generateRecallQuestions(scenario, Date.now(), Math.min(6, Math.max(4, scenario.detailCount - 1)))
     setQueue(qs); setQIndex(0); setSelected(null); setRevealed(false); setSessionLog([])
     setPage('recallQuiz')
   }
@@ -309,8 +311,8 @@ export default function App() {
                   <PlayCircle className="w-6 h-6" />
                 </div>
                 <div>
-                  <p className="font-semibold">Video Recall Drill</p>
-                  <p className="text-neutral-400 text-sm">Watch a timed fireground scene, then recall the details. Trains observation under pressure.</p>
+                  <p className="font-semibold">Visual Recall Drill</p>
+                  <p className="text-neutral-400 text-sm">Study an operational board — command board, roster, dispatch, floor plan — then recall the details from memory.</p>
                 </div>
               </div>
               <ChevronRight className="w-5 h-5 text-neutral-500" />
@@ -482,47 +484,155 @@ export default function App() {
   }
 
   if (page === 'recallWatch' && scenario) {
-    // Continuous progress (0..1) drives staged entrances. Each element has a
-    // "cue" point; once progress passes it, the element animates in.
+    const b = scenario
     const p = sceneProgress
-    const appColor = scenario.apparatus.color === 'lime-green' ? '#84cc16' : scenario.apparatus.color
-    const cue = (threshold) => p >= threshold
-    const enter = (threshold) =>
-      cue(threshold)
-        ? 'opacity-100 translate-y-0 translate-x-0 scale-100'
-        : 'opacity-0 translate-y-3 scale-95'
-    const smokeIntensity = Math.min(1, p * 1.4) // smoke builds as scene progresses
-    const visibleEvents = scenario.events.slice(0, sceneStep)
-    const ringPct = Math.round(p * 100)
+    const colorHex = (c) => c === 'lime-green' ? '#84cc16' : c === 'white' ? '#e5e5e5' : c
+    const enterStyle = (i) => ({
+      animation: 'recIn 0.45s cubic-bezier(.2,.8,.2,1) both',
+      animationDelay: (i * 0.07) + 's',
+    })
+
+    // --- board renderers -----------------------------------------------------
+    const Header = () => (
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2">
+          <span className="w-8 h-8 rounded-lg bg-rose-600/20 text-rose-300 grid place-items-center">
+            <ClipboardList className="w-4 h-4" />
+          </span>
+          <div>
+            <p className="font-semibold text-neutral-100 leading-tight">{b.title}</p>
+            <p className="text-[11px] text-neutral-500">
+              {b.header && Object.values(b.header).join(' · ')}
+            </p>
+          </div>
+        </div>
+        <span className="text-[10px] uppercase tracking-wider text-neutral-500 ring-1 ring-neutral-700 rounded px-2 py-0.5">
+          {b.detailCount} details · D{b.difficulty}
+        </span>
+      </div>
+    )
+
+    const renderRows = (rows, render) => (
+      <div className="space-y-2">
+        {rows.map((r, i) => (
+          <div key={i} style={enterStyle(i)}
+            className="rounded-lg bg-neutral-800/70 ring-1 ring-neutral-700 px-3 py-2.5">
+            {render(r, i)}
+          </div>
+        ))}
+      </div>
+    )
+
+    let body = null
+    if (b.kind === 'command') {
+      body = (
+        <>
+          <div className="grid grid-cols-3 gap-2 mb-4">
+            {[['Incident', b.header.incident], ['Address', b.header.address], ['Command', b.header.command]].map(([k, v], i) => (
+              <div key={i} style={enterStyle(i)} className="rounded-lg bg-neutral-800/70 ring-1 ring-neutral-700 px-3 py-2">
+                <p className="text-[10px] uppercase tracking-wide text-neutral-500">{k}</p>
+                <p className="text-sm font-medium text-neutral-100">{v}</p>
+              </div>
+            ))}
+          </div>
+          <p className="text-[10px] uppercase tracking-wide text-neutral-500 mb-1.5">Units (in arrival order)</p>
+          {renderRows(b.rows, (r) => (
+            <div className="flex items-center gap-3">
+              <span className="w-6 h-6 rounded-md bg-rose-600/20 text-rose-300 grid place-items-center text-xs font-bold">{r.arrival}</span>
+              <Truck className="w-4 h-4 text-neutral-400" />
+              <span className="text-sm font-medium text-neutral-100">{r.unit}</span>
+              <span className="ml-auto text-xs text-neutral-400">{r.assignment}</span>
+            </div>
+          ))}
+        </>
+      )
+    } else if (b.kind === 'roster') {
+      body = (
+        <>{renderRows(b.rows, (r) => (
+          <div className="flex items-center gap-3">
+            <span className="w-3 h-3 rounded-full ring-1 ring-neutral-600" style={{ background: colorHex(r.helmet) }} />
+            <span className="text-sm font-semibold text-neutral-100 w-24">{r.name}</span>
+            <span className="text-xs text-neutral-400 w-24">{r.rank}</span>
+            <span className="ml-auto text-xs text-neutral-300">{r.assignment}</span>
+          </div>
+        ))}</>
+      )
+    } else if (b.kind === 'apparatus') {
+      body = (
+        <>{renderRows(b.rows, (r) => (
+          <div className="flex items-center gap-3">
+            <Truck className="w-5 h-5" style={{ color: colorHex(r.color) }} />
+            <span className="text-sm font-semibold text-neutral-100 w-24">{r.unit}</span>
+            <span className="text-xs text-neutral-500 w-16">{r.color}</span>
+            <span className="text-xs text-neutral-400">{r.crew} crew</span>
+            <span className="ml-auto text-[11px] px-2 py-0.5 rounded-full bg-neutral-700 text-neutral-200">{r.status}</span>
+          </div>
+        ))}</>
+      )
+    } else if (b.kind === 'dispatch') {
+      body = (
+        <div className="grid grid-cols-2 gap-2">
+          {b.fields.map((f, i) => (
+            <div key={i} style={enterStyle(i)} className="rounded-lg bg-neutral-800/70 ring-1 ring-neutral-700 px-3 py-2">
+              <p className="text-[10px] uppercase tracking-wide text-neutral-500">{f.label}</p>
+              <p className="text-sm font-medium text-neutral-100">{f.value}</p>
+            </div>
+          ))}
+        </div>
+      )
+    } else if (b.kind === 'equipment') {
+      body = (
+        <>{renderRows(b.rows, (r) => (
+          <div className="flex items-center gap-3">
+            <Wrench className="w-4 h-4 text-neutral-400" />
+            <span className="text-sm font-medium text-neutral-100">{r.tool}</span>
+            <span className="ml-auto text-xs text-neutral-500">{r.compartment}</span>
+            <span className="text-xs text-neutral-400 w-8 text-right">×{r.qty}</span>
+          </div>
+        ))}</>
+      )
+    } else if (b.kind === 'floorplan') {
+      const d = b.diagram
+      body = (
+        <>
+          <p className="text-[10px] uppercase tracking-wide text-neutral-500 mb-2">{d.stories}-story · entry {d.entry}</p>
+          <div className="grid grid-cols-2 gap-2">
+            {d.rooms.map((room, i) => {
+              const isVictim = room === d.victimRoom
+              return (
+                <div key={i} style={enterStyle(i)}
+                  className={'rounded-lg px-3 py-3 ring-1 text-sm font-medium ' +
+                    (isVictim ? 'bg-rose-600/20 ring-rose-500/50 text-rose-200' : 'bg-neutral-800/70 ring-neutral-700 text-neutral-200')}>
+                  <div className="flex items-center justify-between">
+                    <span>{room}</span>
+                    {isVictim && <Heart className="w-4 h-4 text-rose-400" />}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+          <div className="mt-3 flex items-center gap-2 text-xs text-amber-300 bg-amber-500/10 ring-1 ring-amber-500/30 rounded-md px-2.5 py-1.5">
+            <AlertTriangle className="w-3.5 h-3.5" /> {d.hazard} — {d.hazardSide} side
+          </div>
+        </>
+      )
+    }
 
     return (
-      <div className="min-h-screen bg-neutral-950 text-neutral-100 overflow-hidden">
+      <div className="min-h-screen bg-neutral-950 text-neutral-100">
         <style>{`
-          @keyframes driveIn { from { transform: translateX(-120%); } to { transform: translateX(0); } }
-          @keyframes smokeRise {
-            0% { transform: translateY(8px) scale(0.6); opacity: 0; }
-            30% { opacity: 0.7; }
-            100% { transform: translateY(-46px) scale(1.6); opacity: 0; }
-          }
-          @keyframes flickerLight { 0%,100% { opacity: 0.85; } 50% { opacity: 0.35; } }
-          @keyframes slideInRight { from { transform: translateX(24px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
-          @keyframes popIn { 0% { transform: scale(0.7); opacity: 0; } 70% { transform: scale(1.05); } 100% { transform: scale(1); opacity: 1; } }
-          @keyframes hazardBlink { 0%,100% { background-color: rgba(245,158,11,0.12); box-shadow: 0 0 0 rgba(245,158,11,0); } 50% { background-color: rgba(245,158,11,0.30); box-shadow: 0 0 18px rgba(245,158,11,0.45); } }
-          @keyframes emberFloat { 0% { transform: translateY(0) translateX(0); opacity: 0; } 20% { opacity: 1; } 100% { transform: translateY(-60px) translateX(var(--drift)); opacity: 0; } }
-          .scene-enter { transition: opacity .6s ease, transform .6s cubic-bezier(.2,.7,.2,1); }
+          @keyframes recIn { from { opacity: 0; transform: translateY(6px) scale(0.98); } to { opacity: 1; transform: none; } }
         `}</style>
-
         <header className="max-w-3xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-2 text-sm text-rose-400">
-            <span className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-pulse" /> REC — observe carefully
+            <span className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-pulse" /> STUDY THE BOARD — memorize the details
           </div>
-          {/* Circular countdown ring */}
           <div className="relative w-12 h-12">
             <svg viewBox="0 0 36 36" className="w-12 h-12 -rotate-90">
               <circle cx="18" cy="18" r="15.5" fill="none" stroke="#3f3f46" strokeWidth="3" />
               <circle cx="18" cy="18" r="15.5" fill="none" stroke="#f43f5e" strokeWidth="3"
                 strokeDasharray={2 * Math.PI * 15.5}
-                strokeDashoffset={(2 * Math.PI * 15.5) * (1 - (1 - p))}
+                strokeDashoffset={(2 * Math.PI * 15.5) * p}
                 strokeLinecap="round" style={{ transition: 'stroke-dashoffset .1s linear' }} />
             </svg>
             <span className="absolute inset-0 grid place-items-center text-xs font-semibold text-neutral-200">{sceneTimeLeft}s</span>
@@ -530,155 +640,14 @@ export default function App() {
         </header>
 
         <main className="max-w-3xl mx-auto px-6 pb-10">
-          {/* ===== ANIMATED STAGE ===== */}
-          <div className="relative rounded-2xl ring-1 ring-neutral-800 bg-gradient-to-b from-sky-950/40 via-neutral-900 to-neutral-950 overflow-hidden h-64">
-            {/* night sky / ground */}
-            <div className="absolute inset-x-0 bottom-0 h-16 bg-neutral-800/70" />
-            <div className="absolute inset-x-0 bottom-16 h-px bg-neutral-700" />
-
-            {/* Building rises in */}
-            <div className={'absolute bottom-16 right-10 scene-enter ' + enter(0.18)}>
-              <div className="relative">
-                {/* roof feature marker */}
-                <div className="absolute -top-4 right-2 text-[10px] text-neutral-400">{scenario.building.roofFeature}</div>
-                {/* building body sized by stories */}
-                <div className="bg-neutral-700 rounded-t-sm ring-1 ring-neutral-600"
-                  style={{ width: 132, height: 36 + scenario.building.stories * 26 }}>
-                  {/* window grid that lights up */}
-                  <div className="grid grid-cols-4 gap-1.5 p-2">
-                    {Array.from({ length: scenario.building.windows }).map((_, i) => (
-                      <span key={i} className="rounded-sm"
-                        style={{
-                          width: 18, height: 14,
-                          background: cue(0.3) ? '#fbbf24' : '#27272a',
-                          animation: cue(0.3) ? `flickerLight ${1.2 + (i % 3) * 0.4}s ease-in-out ${i * 0.15}s infinite` : 'none',
-                          transition: 'background .4s ease',
-                        }} />
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Rising smoke from roof (intensifies with progress) */}
-            {cue(0.22) && (
-              <div className="absolute right-16 pointer-events-none" style={{ bottom: 16 + 36 + scenario.building.stories * 26 }}>
-                {Array.from({ length: 6 }).map((_, i) => (
-                  <span key={i} className="absolute rounded-full"
-                    style={{
-                      width: 16 + i * 3, height: 16 + i * 3,
-                      left: (i % 3) * 10 - 10,
-                      background: scenario.conditions.smoke.includes('black') ? 'rgba(40,40,45,0.8)'
-                        : scenario.conditions.smoke.includes('brown') ? 'rgba(90,70,50,0.7)' : 'rgba(160,160,170,0.6)',
-                      filter: 'blur(4px)',
-                      animation: `smokeRise ${2.4 + (i % 3) * 0.6}s ease-out ${i * 0.35}s infinite`,
-                      opacity: smokeIntensity,
-                    }} />
-                ))}
-              </div>
-            )}
-
-            {/* Apparatus drives in from the left */}
-            {cue(0.05) && (
-              <div className="absolute bottom-16 left-6" style={{ animation: 'driveIn 1.4s cubic-bezier(.2,.8,.2,1) both' }}>
-                <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md ring-1 ring-neutral-600 bg-neutral-800/90">
-                  <Truck className="w-5 h-5" style={{ color: appColor }} />
-                  <span className="text-xs font-semibold">{scenario.apparatus.unit}</span>
-                </div>
-                {/* spinning light bar */}
-                <div className="mt-0.5 h-1 rounded-full overflow-hidden bg-neutral-700">
-                  <div className="h-full w-1/3 bg-rose-500" style={{ animation: 'slideInRight 0.9s linear infinite' }} />
-                </div>
-              </div>
-            )}
-
-            {/* Embers drifting up (ambiance) */}
-            {cue(0.35) && Array.from({ length: 8 }).map((_, i) => (
-              <span key={i} className="absolute rounded-full bg-orange-400"
-                style={{
-                  width: 3, height: 3, right: 60 + (i * 11) % 80, bottom: 60,
-                  ['--drift']: (i % 2 ? 1 : -1) * (8 + i) + 'px',
-                  animation: `emberFloat ${2 + (i % 4) * 0.6}s ease-out ${i * 0.3}s infinite`,
-                }} />
-            ))}
-
-            {/* Location + time overlay */}
-            <div className={'absolute top-3 left-4 scene-enter ' + enter(0.12)}>
-              <div className="text-xs text-neutral-300 font-medium">{scenario.apparatus.unit}
-                <span className="text-neutral-500"> · {scenario.apparatus.color}</span></div>
-              <div className="text-[11px] text-neutral-400">{scenario.location.address} {scenario.location.street}</div>
-              <div className="text-[11px] text-neutral-500">{scenario.location.occupancy} · {scenario.time}</div>
-            </div>
-
-            {/* Weather/smoke chip */}
-            <div className={'absolute top-3 right-4 scene-enter ' + enter(0.26)}>
-              <span className="text-[11px] inline-flex items-center gap-1 text-amber-300 bg-amber-500/10 ring-1 ring-amber-500/30 rounded-md px-2 py-1">
-                <Wind className="w-3 h-3" /> {scenario.conditions.smoke} · {scenario.conditions.weather}
-              </span>
-            </div>
-          </div>
-
-          {/* ===== HAZARD BANNER (blinks in) ===== */}
-          <div className="mt-3 flex flex-wrap gap-2">
-            {scenario.hazards.map((h, i) => (
-              <span key={i}
-                className={'text-xs px-2.5 py-1.5 rounded-md text-amber-200 ring-1 ring-amber-500/40 inline-flex items-center gap-1.5 scene-enter ' + enter(0.4 + i * 0.05)}
-                style={{ animation: cue(0.4 + i * 0.05) ? 'hazardBlink 1.1s ease-in-out infinite' : 'none' }}>
-                <AlertTriangle className="w-3.5 h-3.5" /> {h}
-              </span>
-            ))}
-          </div>
-
-          {/* ===== PERSONNEL (slide in one at a time) ===== */}
-          <div className="mt-5">
-            <p className="text-xs uppercase tracking-wide text-neutral-500 mb-2">Crew arriving</p>
-            <div className="flex flex-wrap gap-2">
-              {scenario.personnel.map((pp, i) => {
-                const cuePoint = 0.3 + i * 0.08
-                return (
-                  <span key={i}
-                    className="text-xs px-2.5 py-1.5 rounded-full bg-neutral-800 ring-1 ring-neutral-700 inline-flex items-center gap-1.5"
-                    style={{
-                      animation: cue(cuePoint) ? 'popIn 0.5s cubic-bezier(.2,.8,.2,1) both' : 'none',
-                      opacity: cue(cuePoint) ? 1 : 0,
-                    }}>
-                    <span className="w-2 h-2 rounded-full" style={{
-                      background: pp.helmet === 'lime-green' ? '#84cc16' : pp.helmet === 'white' ? '#e5e5e5' : pp.helmet
-                    }} />
-                    <span className="font-medium">{pp.name}</span>
-                    <span className="text-neutral-500">· {pp.role} · {pp.helmet} helmet</span>
-                  </span>
-                )
-              })}
-            </div>
-          </div>
-
-          {/* ===== EVENT TIMELINE (cards slide in on cadence) ===== */}
-          <div className="mt-5">
-            <p className="text-xs uppercase tracking-wide text-neutral-500 mb-2">Actions on scene</p>
-            <div className="space-y-2">
-              {visibleEvents.map((e, i) => {
-                const Icon = SCENE_ICONS[e.icon] || Flame
-                return (
-                  <div key={i}
-                    className="flex items-center gap-3 rounded-lg bg-neutral-800/70 ring-1 ring-neutral-700 px-3 py-2.5"
-                    style={{ animation: 'slideInRight 0.45s cubic-bezier(.2,.8,.2,1) both' }}>
-                    <div className="w-8 h-8 rounded-md bg-rose-600/20 text-rose-300 grid place-items-center shrink-0">
-                      <Icon className="w-4 h-4" />
-                    </div>
-                    <span className="text-sm text-neutral-200">{e.text}</span>
-                    <span className="ml-auto text-xs text-neutral-600 shrink-0">{i + 1}</span>
-                  </div>
-                )
-              })}
-              {visibleEvents.length === 0 && (
-                <p className="text-xs text-neutral-600 italic">Events will unfold as the scene plays…</p>
-              )}
-            </div>
+          {/* Operational board */}
+          <div className="rounded-2xl ring-1 ring-neutral-800 bg-neutral-900 p-5">
+            <Header />
+            {body}
           </div>
 
           <div className="mt-6 flex items-center justify-between">
-            <p className="text-xs text-neutral-500">Watch closely — the scene hides when the ring runs out.</p>
+            <p className="text-xs text-neutral-500">The board hides when the ring runs out. Then you'll recall the details.</p>
             <button onClick={skipToQuiz}
               className="text-sm bg-rose-600 hover:bg-rose-500 rounded-lg px-4 py-2 font-semibold">
               I'm ready — quiz me
@@ -827,7 +796,7 @@ export default function App() {
               className="flex-1 bg-neutral-900 hover:bg-neutral-800 text-white rounded-xl py-3 font-semibold">
               Back to dashboard
             </button>
-            {sessionLabel === 'Video Recall Drill' ? (
+            {sessionLabel === 'Visual Recall Drill' ? (
               <button onClick={startRecallDrill}
                 className="flex-1 bg-rose-600 hover:bg-rose-500 text-white rounded-xl py-3 font-semibold">
                 New recall drill
