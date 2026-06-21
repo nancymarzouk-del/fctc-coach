@@ -1,0 +1,19 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: system-ui, -apple-system, sans-serif;
+}
+
+.firefighter-red {
+  color: #dc2626;
+}
+
+.bg-firefighter-red {
+  background-color: #dc2626;
+}
