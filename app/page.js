@@ -8,9 +8,9 @@ import {
 } from 'lucide-react'
 import { questionProvider, SUBSKILLS, makeRng } from '../lib/questionEngine'
 import {
-  storage, blankState, recordAnswer, endSession, readinessScore,
+  storage, blankState, recordAnswer, endSession, readinessScore, readinessInfo,
   overallConfidence, domainMastery, subskillMastery, subskillConfidence,
-  weakAreas, buildTargetedSession, recommendations,
+  weakAreas, buildTargetedSession, recommendations, nextBestAction,
   commitSessionStats, categoryStats
 } from '../lib/learningEngine'
 import { generateScenario, generateBoard, generateRecallQuestions } from '../lib/recallScenario'
@@ -116,7 +116,7 @@ export default function App() {
     const q = queue[qIndex]
     const correct = idx === q.correct
     const next = { ...state }
-    recordAnswer(next, q.domain, q.subskill, correct)
+    recordAnswer(next, q.domain, q.subskill, correct, q.difficulty)
     persist(next)
     setSessionLog(l => [...l, { correct, domain: q.domain, subskill: q.subskill, q }])
   }
@@ -180,7 +180,7 @@ export default function App() {
     const q = queue[qIndex]
     const correct = idx === q.correct
     const next = { ...state }
-    recordAnswer(next, 'recall', q.subskill, correct)
+    recordAnswer(next, 'recall', q.subskill, correct, q.difficulty)
     persist(next)
     setSessionLog(l => [...l, { correct, domain: 'recall', subskill: q.subskill, q }])
   }
@@ -248,8 +248,10 @@ export default function App() {
   }
 
   if (page === 'dashboard' && state) {
-    const ready = readinessScore(state)
+    const readyInfo = readinessInfo(state)
+    const ready = readyInfo.score
     const conf = overallConfidence(state)
+    const nba = nextBestAction(state)
     const recs = recommendations(state)
     const weak = weakAreas(state, 4)
     const fresh = state.totalAnswered === 0
@@ -275,26 +277,51 @@ export default function App() {
           <section className="grid md:grid-cols-3 gap-4">
             <div className="md:col-span-2 bg-white rounded-2xl p-6 ring-1 ring-neutral-200">
               <div className="flex items-center gap-2 text-neutral-500 text-sm"><Gauge className="w-4 h-4" /> Readiness score</div>
-              <div className="mt-2 flex items-end gap-3">
-                <span className="text-6xl font-bold tracking-tight text-neutral-900">{ready}</span>
-                <span className="text-neutral-400 mb-2">/ 100</span>
-              </div>
-              <div className="mt-4 h-2 rounded-full bg-neutral-200 overflow-hidden">
-                <div className="h-full bg-orange-600 transition-all" style={{ width: ready + '%' }} />
-              </div>
-              <p className="mt-3 text-sm text-neutral-600">
-                {fresh ? 'Run the diagnostic so the engine can map your strengths and gaps.'
-                  : 'Confidence in this estimate: ' + conf + '%. Readiness weights your weakest domain, so balanced practice moves it fastest.'}
-              </p>
+              {readyInfo.sufficientEvidence ? (
+                <>
+                  <div className="mt-2 flex items-end gap-3">
+                    <span className="text-6xl font-bold tracking-tight text-neutral-900">{ready}</span>
+                    <span className="text-neutral-400 mb-2">/ 100</span>
+                  </div>
+                  <div className="mt-4 h-2 rounded-full bg-neutral-200 overflow-hidden">
+                    <div className="h-full bg-orange-600 transition-all" style={{ width: ready + '%' }} />
+                  </div>
+                  <p className="mt-3 text-sm text-neutral-600">
+                    Based on the {readyInfo.evaluatedCount} skill{readyInfo.evaluatedCount === 1 ? '' : 's'} you've
+                    practiced enough to measure (of {readyInfo.totalCount}). It weights your weakest evaluated
+                    skill{readyInfo.weakestLabel ? ' (' + readyInfo.weakestLabel + ')' : ''}, so balanced practice moves it fastest.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <div className="mt-2 flex items-end gap-3">
+                    <span className="text-4xl font-bold tracking-tight text-neutral-400">Building your baseline</span>
+                  </div>
+                  <p className="mt-3 text-sm text-neutral-600">
+                    {fresh
+                      ? 'Run the diagnostic so the coach can measure your strengths and gaps.'
+                      : `You've practiced ${readyInfo.evaluatedCount} of ${readyInfo.totalCount} skills enough to measure. A readiness score appears once there's enough evidence to make it honest — no guesses.`}
+                  </p>
+                </>
+              )}
             </div>
             <div className="bg-white rounded-2xl p-6 ring-1 ring-neutral-200 flex flex-col">
-              <div className="flex items-center gap-2 text-neutral-500 text-sm"><Target className="w-4 h-4" /> Recommended next</div>
-              <div className="mt-3 space-y-2 flex-1">
-                {recs.slice(0, 3).map((r, i) => (
-                  <div key={i} className="text-sm text-neutral-700 flex gap-2">
-                    <Lightbulb className="w-4 h-4 text-orange-500 shrink-0 mt-0.5" /><span>{r.text}</span>
+              <div className="flex items-center gap-2 text-neutral-500 text-sm"><Target className="w-4 h-4" /> What to work on next</div>
+              <div className="mt-3 flex-1">
+                <div className="flex items-start gap-2">
+                  <Lightbulb className="w-4 h-4 text-orange-500 shrink-0 mt-1" />
+                  <div>
+                    <p className="text-sm font-semibold text-neutral-900">{nba.title}</p>
+                    <p className="mt-1 text-sm text-neutral-600">{nba.why}</p>
                   </div>
-                ))}
+                </div>
+                {recs.length > 1 && (
+                  <div className="mt-3 pt-3 border-t border-neutral-100 space-y-1.5">
+                    {recs.slice(0, 2).map((r, i) => (
+                      <p key={i} className="text-xs text-neutral-500 leading-snug">{r.text}</p>
+                    ))}
+                  </div>
+                )}
               </div>
               <button onClick={fresh ? startDiagnostic : startTargeted}
                 className="mt-4 w-full bg-neutral-900 hover:bg-neutral-800 text-white rounded-lg py-2.5 text-sm font-semibold flex items-center justify-center gap-2">
@@ -720,7 +747,7 @@ export default function App() {
   if (page === 'results' && state) {
     const correct = sessionLog.filter(l => l.correct).length
     const pct = sessionLog.length ? Math.round((correct / sessionLog.length) * 100) : 0
-    const ready = readinessScore(state)
+    const readyInfo = readinessInfo(state)
 
     const bySub = {}
     for (const l of sessionLog) {
@@ -745,7 +772,10 @@ export default function App() {
             <p className="text-6xl font-bold text-neutral-900 mt-2">{pct}%</p>
             <p className="text-neutral-600 mt-1">{correct} of {sessionLog.length} correct</p>
             <div className="mt-6 inline-flex items-center gap-2 text-sm bg-neutral-100 rounded-full px-4 py-2">
-              <Gauge className="w-4 h-4 text-orange-500" /> Readiness now {ready}/100
+              <Gauge className="w-4 h-4 text-orange-500" />
+              {readyInfo.sufficientEvidence
+                ? `Readiness now ${readyInfo.score}/100`
+                : `Building your baseline — ${readyInfo.evaluatedCount}/${readyInfo.totalCount} skills measured`}
             </div>
           </div>
 
