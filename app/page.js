@@ -572,6 +572,9 @@ export default function App() {
                     <p className="text-sm text-rose-700 bg-rose-50 rounded-lg px-3 py-2 mb-2 leading-relaxed">{q.meta.diagnostics[q.options[selected]]}</p>
                   )}
                   <p className="text-sm text-neutral-700 leading-relaxed">{q.explanation}</p>
+                  {q.meta?.strategy && (
+                    <p className="mt-2 text-sm text-sky-800 bg-sky-50 rounded-lg px-3 py-2 leading-relaxed">{q.meta.strategy}</p>
+                  )}
                   <button onClick={nextQuestion}
                     className="mt-4 w-full bg-neutral-900 hover:bg-neutral-800 text-white rounded-lg py-3 font-semibold flex items-center justify-center gap-2">
                     {qIndex + 1 < queue.length ? 'Next question' : 'See results'} <ChevronRight className="w-4 h-4" />
