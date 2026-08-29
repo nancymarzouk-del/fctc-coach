@@ -11,9 +11,10 @@ import {
   storage, blankState, recordAnswer, endSession, readinessScore, readinessInfo,
   overallConfidence, domainMastery, subskillMastery, subskillConfidence,
   weakAreas, buildTargetedSession, recommendations, nextBestAction,
-  commitSessionStats, categoryStats
+  buildRemediationSession, commitSessionStats, categoryStats
 } from '../lib/learningEngine'
 import { generateScenario, generateBoard, generateRecallQuestions } from '../lib/recallScenario'
+import MechanicalDiagram from '../components/MechanicalDiagram'
 
 const DOMAIN_ICONS = { mechanical: Wrench, math: TrendingUp, reading: BookOpen, recall: Eye }
 const DOMAIN_ACCENT = {
@@ -79,14 +80,31 @@ export default function App() {
 
   const startSession = (plan, label) => {
     const rng = makeRng(Date.now())
-    const qs = plan.map(p => questionProvider.generate({
-      domain: p.domain, subskill: p.subskill, difficulty: p.difficulty, count: 1, rng,
-    })[0]).filter(Boolean)
+    const qs = plan.map(p => {
+      const q = questionProvider.generate({
+        domain: p.domain, subskill: p.subskill, difficulty: p.difficulty, count: 1, rng,
+      })[0]
+      // Carry the plan item's teaching mode/guidance onto the question so the
+      // session can render guided worked-examples vs. graded transfer questions.
+      return q ? { ...q, mode: p.mode || 'graded', guidance: p.guidance || null } : null
+    }).filter(Boolean)
     setQueue(qs); setQIndex(0); setSelected(null); setRevealed(false)
     setSessionLog([]); setSessionLabel(label); setPage('session')
   }
 
   const startTargeted = () => startSession(buildTargetedSession(state, 10), 'Targeted Practice')
+
+  // Repeated misses in a mechanical subskill → a guided remediation ladder
+  // (worked example → progressively harder transfer). Falls back to targeted
+  // practice for non-mechanical or non-visual subskills.
+  const startNextBestAction = () => {
+    const a = nextBestAction(state)
+    if (a && a.domain === 'mechanical' && a.subskill && (a.kind === 'weak' || a.kind === 'build')) {
+      startSession(buildRemediationSession(state, a.domain, a.subskill), 'Guided Practice')
+    } else {
+      startTargeted()
+    }
+  }
 
   const startDomain = (domain) => {
     // Recall is always trained visually (study a board, then recall) — never
@@ -323,9 +341,9 @@ export default function App() {
                   </div>
                 )}
               </div>
-              <button onClick={fresh ? startDiagnostic : startTargeted}
+              <button onClick={fresh ? startDiagnostic : startNextBestAction}
                 className="mt-4 w-full bg-neutral-900 hover:bg-neutral-800 text-white rounded-lg py-2.5 text-sm font-semibold flex items-center justify-center gap-2">
-                {fresh ? 'Start diagnostic' : 'Start targeted practice'} <ChevronRight className="w-4 h-4" />
+                {fresh ? 'Start diagnostic' : (nba.kind === 'weak' && nba.domain === 'mechanical' ? 'Start guided practice' : 'Start practice')} <ChevronRight className="w-4 h-4" />
               </button>
             </div>
           </section>
@@ -474,36 +492,60 @@ export default function App() {
           {q.passage && (
             <pre className="whitespace-pre-wrap text-sm bg-neutral-900 text-neutral-100 rounded-xl p-4 mb-5 font-mono leading-relaxed">{q.passage}</pre>
           )}
+          {q.mode === 'guided' && (
+            <div className="mb-4 flex items-center gap-2 text-xs font-semibold text-orange-700 bg-orange-50 ring-1 ring-orange-200 rounded-lg px-3 py-2">
+              <Lightbulb className="w-4 h-4 shrink-0" /> Guided example — study how it works, then you'll try one yourself.
+            </div>
+          )}
           <h2 className="text-xl font-semibold text-neutral-900 mb-5">{q.prompt}</h2>
-          <div className="space-y-3">
-            {q.options.map((opt, idx) => {
-              const isCorrect = idx === q.correct
-              const isPicked = idx === selected
-              let cls = 'border-neutral-200 hover:border-orange-400 hover:bg-orange-50'
-              if (revealed && isCorrect) cls = 'border-emerald-500 bg-emerald-50'
-              else if (revealed && isPicked && !isCorrect) cls = 'border-rose-500 bg-rose-50'
-              else if (revealed) cls = 'border-neutral-200 opacity-60'
-              return (
-                <button key={idx} disabled={revealed} onClick={() => answer(idx)}
-                  className={'w-full text-left px-4 py-3.5 rounded-xl border-2 transition flex items-center justify-between ' + cls}>
-                  <span className="text-neutral-800"><span className="text-neutral-400 mr-2">{String.fromCharCode(65 + idx)}</span>{opt}</span>
-                  {revealed && isCorrect && <CheckCircle2 className="w-5 h-5 text-emerald-600" />}
-                  {revealed && isPicked && !isCorrect && <XCircle className="w-5 h-5 text-rose-600" />}
-                </button>
-              )
-            })}
-          </div>
-          {revealed && (
-            <div className="mt-5 bg-white ring-1 ring-neutral-200 rounded-xl p-4">
+          {q.visual && <MechanicalDiagram visual={q.visual} revealed={q.mode === 'guided' ? true : revealed} />}
+          {q.mode === 'guided' ? (
+            <div className="bg-white ring-1 ring-neutral-200 rounded-xl p-4">
               <div className="flex items-center gap-2 text-sm font-semibold text-neutral-700 mb-1">
-                <Lightbulb className="w-4 h-4 text-orange-500" /> Why
+                <Lightbulb className="w-4 h-4 text-orange-500" /> The rule
               </div>
               <p className="text-sm text-neutral-700 leading-relaxed">{q.explanation}</p>
               <button onClick={nextQuestion}
                 className="mt-4 w-full bg-neutral-900 hover:bg-neutral-800 text-white rounded-lg py-3 font-semibold flex items-center justify-center gap-2">
-                {qIndex + 1 < queue.length ? 'Next question' : 'See results'} <ChevronRight className="w-4 h-4" />
+                {q.guidance || 'Try one yourself'} <ChevronRight className="w-4 h-4" />
               </button>
             </div>
+          ) : (
+            <>
+              {q.guidance && !revealed && (
+                <p className="text-xs text-neutral-500 mb-3">{q.guidance}</p>
+              )}
+              <div className="space-y-3">
+                {q.options.map((opt, idx) => {
+                  const isCorrect = idx === q.correct
+                  const isPicked = idx === selected
+                  let cls = 'border-neutral-200 hover:border-orange-400 hover:bg-orange-50'
+                  if (revealed && isCorrect) cls = 'border-emerald-500 bg-emerald-50'
+                  else if (revealed && isPicked && !isCorrect) cls = 'border-rose-500 bg-rose-50'
+                  else if (revealed) cls = 'border-neutral-200 opacity-60'
+                  return (
+                    <button key={idx} disabled={revealed} onClick={() => answer(idx)}
+                      className={'w-full text-left px-4 py-3.5 rounded-xl border-2 transition flex items-center justify-between ' + cls}>
+                      <span className="text-neutral-800"><span className="text-neutral-400 mr-2">{String.fromCharCode(65 + idx)}</span>{opt}</span>
+                      {revealed && isCorrect && <CheckCircle2 className="w-5 h-5 text-emerald-600" />}
+                      {revealed && isPicked && !isCorrect && <XCircle className="w-5 h-5 text-rose-600" />}
+                    </button>
+                  )
+                })}
+              </div>
+              {revealed && (
+                <div className="mt-5 bg-white ring-1 ring-neutral-200 rounded-xl p-4">
+                  <div className="flex items-center gap-2 text-sm font-semibold text-neutral-700 mb-1">
+                    <Lightbulb className="w-4 h-4 text-orange-500" /> Why
+                  </div>
+                  <p className="text-sm text-neutral-700 leading-relaxed">{q.explanation}</p>
+                  <button onClick={nextQuestion}
+                    className="mt-4 w-full bg-neutral-900 hover:bg-neutral-800 text-white rounded-lg py-3 font-semibold flex items-center justify-center gap-2">
+                    {qIndex + 1 < queue.length ? 'Next question' : 'See results'} <ChevronRight className="w-4 h-4" />
+                  </button>
+                </div>
+              )}
+            </>
           )}
         </main>
       </div>
@@ -709,6 +751,7 @@ export default function App() {
             </span>
           </div>
           <h2 className="text-xl font-semibold text-neutral-900 mb-5">{q.prompt}</h2>
+          {q.visual && <MechanicalDiagram visual={q.visual} revealed={revealed} />}
           <div className="space-y-3">
             {q.options.map((opt, idx) => {
               const isCorrect = idx === q.correct
