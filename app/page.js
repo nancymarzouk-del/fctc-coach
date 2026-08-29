@@ -15,6 +15,7 @@ import {
 } from '../lib/learningEngine'
 import { generateScenario, generateBoard, generateRecallQuestions } from '../lib/recallScenario'
 import MechanicalDiagram from '../components/MechanicalDiagram'
+import MockExam from '../components/MockExam'
 
 const DOMAIN_ICONS = { mechanical: Wrench, math: TrendingUp, reading: BookOpen, recall: Eye }
 const DOMAIN_ACCENT = {
@@ -265,6 +266,18 @@ export default function App() {
     )
   }
 
+  if (page === 'mock' && state) {
+    return (
+      <MockExam
+        state={state}
+        onCommit={(next) => persist(next)}
+        onRemediate={(d, s) => startSession(buildRemediationSession(state, d, s), 'Guided Practice')}
+        onTargeted={startTargeted}
+        onExit={() => setPage('dashboard')}
+      />
+    )
+  }
+
   if (page === 'dashboard' && state) {
     const readyInfo = readinessInfo(state)
     const ready = readyInfo.score
@@ -348,19 +361,32 @@ export default function App() {
             </div>
           </section>
 
-          <section className="mt-4">
+          <section className="mt-4 grid md:grid-cols-2 gap-4">
             <button onClick={startRecallDrill}
-              className="w-full text-left rounded-2xl p-5 ring-1 ring-neutral-800 bg-neutral-900 text-neutral-100 hover:bg-neutral-800 transition flex items-center justify-between">
+              className="text-left rounded-2xl p-5 ring-1 ring-neutral-800 bg-neutral-900 text-neutral-100 hover:bg-neutral-800 transition flex items-center justify-between">
               <div className="flex items-center gap-4">
                 <div className="w-12 h-12 rounded-xl bg-rose-600/20 text-rose-400 grid place-items-center">
                   <PlayCircle className="w-6 h-6" />
                 </div>
                 <div>
                   <p className="font-semibold">Visual Recall Drill</p>
-                  <p className="text-neutral-400 text-sm">Study an operational board — command board, roster, dispatch, floor plan — then recall the details from memory.</p>
+                  <p className="text-neutral-400 text-sm">Study an operational board, then recall the details from memory.</p>
                 </div>
               </div>
               <ChevronRight className="w-5 h-5 text-neutral-500" />
+            </button>
+            <button onClick={() => setPage('mock')}
+              className="text-left rounded-2xl p-5 ring-1 ring-orange-200 bg-orange-50 hover:bg-orange-100 transition flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-xl bg-orange-600 text-white grid place-items-center">
+                  <Gauge className="w-6 h-6" />
+                </div>
+                <div>
+                  <p className="font-semibold text-neutral-900">Full Mock Exam</p>
+                  <p className="text-neutral-600 text-sm">100 questions · 2.5-hour timer · mixed areas, with a full breakdown.</p>
+                </div>
+              </div>
+              <ChevronRight className="w-5 h-5 text-orange-400" />
             </button>
           </section>
 

@@ -13,7 +13,9 @@ import {
   MIN_EVIDENCE, WEAK_THRESHOLD, EVIDENCE,
   classifySkill, analyzeSkills, readiness, nextBestAction, skillNeed,
   masteryEstimate, confidenceEstimate, recencyWeightedAccuracy, improvementTrend,
+  mockBlueprint,
 } from '../lib/metrics.mjs';
+import { makeRng } from '../lib/mechanicalVisuals.mjs';
 import { LEARNERS, REGISTRY, sub, T, F, rep } from './fixtures.mjs';
 
 const clf = (s) => classifySkill(s, { subskillLabel: 'X', domainLabel: 'D' });
@@ -154,6 +156,29 @@ test('every non-start next-best-action carries a why sentence', () => {
     const a = nextBestAction(L.domains, REGISTRY, { totalAnswered: L.totalAnswered });
     assert.ok(a.title && a.why && a.why.length > 12, `${L.label}: NBA must explain itself`);
   }
+});
+
+// ---- Mock exam blueprint ----------------------------------------------------
+test('mock blueprint: exactly total questions, every subskill covered, mixed & deterministic', () => {
+  const ds = {
+    mechanical: ['levers', 'pulleys', 'gears', 'belts', 'hydraulics', 'balance', 'inclinedPlane', 'forceMotion'],
+    math: ['fractions', 'ratios', 'percentages', 'unitConversion', 'timeDistance', 'areaVolume', 'wordProblem'],
+    reading: ['sop', 'equipment', 'incidentReport', 'safety'],
+  };
+  const plan = mockBlueprint(ds, { total: 100, rng: makeRng(1) });
+  assert.equal(plan.length, 100, 'exactly 100 questions');
+  // every subskill of every covered domain appears at least once
+  for (const [d, subs] of Object.entries(ds)) {
+    for (const s of subs) {
+      assert.ok(plan.some((p) => p.domain === d && p.subskill === s), `missing ${d}/${s}`);
+    }
+  }
+  // domains interleave (not blocked): the first 10 aren't all one domain
+  assert.ok(new Set(plan.slice(0, 10).map((p) => p.domain)).size > 1, 'exam must be mixed');
+  // difficulties are within range
+  assert.ok(plan.every((p) => p.difficulty >= 1 && p.difficulty <= 5));
+  // deterministic
+  assert.deepEqual(plan, mockBlueprint(ds, { total: 100, rng: makeRng(1) }));
 });
 
 // ---- Determinism ------------------------------------------------------------
