@@ -383,7 +383,11 @@ export default function App() {
                 </div>
                 <div>
                   <p className="font-semibold text-neutral-900">Full Mock Exam</p>
-                  <p className="text-neutral-600 text-sm">100 questions · 2.5-hour timer · mixed areas, with a full breakdown.</p>
+                  <p className="text-neutral-600 text-sm">
+                    {state.lastMock
+                      ? `Last score ${state.lastMock.pct}% (${state.lastMock.correct}/${state.lastMock.total}). Take another to track progress.`
+                      : '100 questions · 2.5-hour timer · mixed areas, with a full breakdown.'}
+                  </p>
                 </div>
               </div>
               <ChevronRight className="w-5 h-5 text-orange-400" />
@@ -564,6 +568,9 @@ export default function App() {
                   <div className="flex items-center gap-2 text-sm font-semibold text-neutral-700 mb-1">
                     <Lightbulb className="w-4 h-4 text-orange-500" /> Why
                   </div>
+                  {selected != null && selected !== q.correct && q.meta?.diagnostics?.[q.options[selected]] && (
+                    <p className="text-sm text-rose-700 bg-rose-50 rounded-lg px-3 py-2 mb-2 leading-relaxed">{q.meta.diagnostics[q.options[selected]]}</p>
+                  )}
                   <p className="text-sm text-neutral-700 leading-relaxed">{q.explanation}</p>
                   <button onClick={nextQuestion}
                     className="mt-4 w-full bg-neutral-900 hover:bg-neutral-800 text-white rounded-lg py-3 font-semibold flex items-center justify-center gap-2">

@@ -93,6 +93,8 @@ export default function MockExam({ state, onCommit, onRemediate, onTargeted, onE
     });
     endSession(next);
     commitSessionStats(next, log);
+    // Persist the last mock result so the dashboard can show exam status.
+    next.lastMock = { pct: results.pct, correct: results.correct, total: results.total, answered: results.answered, at: Date.now() };
     onCommit && onCommit(next);
     const nba = nextBestAction(next);
     setOutcome({ results, nba });
