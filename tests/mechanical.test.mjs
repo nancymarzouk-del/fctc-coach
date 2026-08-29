@@ -81,15 +81,24 @@ test('every generated visual question is well-formed and self-consistent', () =>
         const it = build(rng, diff);
         assert.ok(it.visual && it.visual.type, `${key}: missing visual`);
         assert.ok(it.visual.config && it.visual.answerKey && it.visual.reveal, `${key}: incomplete spec`);
-        assert.equal(it.options.length, 4, `${key}: must have 4 options`);
-        assert.ok(it.correct >= 0 && it.correct < 4, `${key}: correct index in range`);
-        assert.equal(new Set(it.options).size, 4, `${key}: options must be distinct`);
+        // Most items have 4 options; balance's tip question has exactly 3 natural
+        // outcomes (balanced / tips left / tips right) — both are valid.
+        assert.ok(it.options.length === 4 || it.options.length === 3, `${key}: 3 or 4 options`);
+        assert.ok(it.correct >= 0 && it.correct < it.options.length, `${key}: correct index in range`);
+        assert.equal(new Set(it.options).size, it.options.length, `${key}: options must be distinct`);
         assert.ok(it.prompt && it.explanation, `${key}: prompt+explanation required`);
 
         // Cross-check the labelled correct answer against the mechanics.
         const ans = it.options[it.correct];
-        if (key === 'pulleys' && /mechanical advantage/i.test(it.prompt)) {
+        if (key === 'pulleys' && /mechanical advantage/i.test(it.prompt) && it.visual.answerKey.ma != null) {
           assert.equal(ans, String(it.visual.answerKey.ma));
+        }
+        // Compare-pulley items: the winner must be the side with more strands
+        // for the "less effort / greater MA / multiplies force" questions.
+        if (it.visual.type === 'pulleyCompare' && /less effort|greater mechanical advantage|multiplies your force/i.test(it.prompt)) {
+          const ak = it.visual.answerKey;
+          const winner = ak.left.ma > ak.right.ma ? 'System A' : 'System B';
+          assert.equal(ans, winner, 'compare winner must be the higher-MA system');
         }
         if (key === 'hydraulics' && /mechanical advantage/i.test(it.prompt)) {
           assert.equal(ans, String(it.visual.answerKey.ma));

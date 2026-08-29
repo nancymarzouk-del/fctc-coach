@@ -125,6 +125,51 @@ function Pulley({ config, answerKey, revealed }) {
   );
 }
 
+// --------------------------------------------------- PULLEY COMPARISON --------
+function miniPulley(originX, sys, label, revealed, ak) {
+  const { system, strands } = sys;
+  const ceilY = 40, topY = 58, barY = 150;
+  const sColor = revealed ? C.reveal : C.structure;
+  const els = [];
+  els.push(<rect key="ceil" x={originX - 55} y={ceilY - 6} width={110} height={6} fill={C.hatch} />);
+  els.push(<text key="lab" x={originX} y={26} fontSize={13} fontWeight={700} fill={C.structure} textAnchor="middle" style={{ fontFamily: 'inherit' }}>{label}</text>);
+  if (system === 'fixed') {
+    const cx = originX - 6, cy = 66, r = 16;
+    els.push(<line key="stem" x1={cx} y1={ceilY} x2={cx} y2={cy - r} stroke={C.structure} strokeWidth={2} />);
+    els.push(<circle key="wheel" cx={cx} cy={cy} r={r} fill="#fff" stroke={C.structure} strokeWidth={2.5} />);
+    els.push(<line key="ls" x1={cx - r} y1={cy} x2={cx - r} y2={150} stroke={sColor} strokeWidth={revealed ? 4 : 2.5} />);
+    els.push(<rect key="load" x={cx - r - 18} y={150} width={36} height={28} rx={3} fill="#fff7ed" stroke={C.load} strokeWidth={2} />);
+    els.push(<line key="es" x1={cx + r} y1={cy} x2={cx + r} y2={158} stroke={C.effort} strokeWidth={2.5} markerEnd="url(#ah-effort)" />);
+  } else {
+    const spacing = clamp(70 / strands, 12, 22);
+    const startX = originX - ((strands - 1) * spacing) / 2;
+    const xs = Array.from({ length: strands }, (_, i) => startX + i * spacing);
+    const minX = xs[0], maxX = xs[xs.length - 1];
+    els.push(<rect key="tb" x={minX - 8} y={topY - 8} width={(maxX - minX) + 16} height={8} rx={2} fill="#f1f5f9" stroke={C.structure} strokeWidth={1.5} />);
+    els.push(<line key="stem" x1={originX} y1={ceilY} x2={originX} y2={topY - 8} stroke={C.structure} strokeWidth={2} />);
+    xs.forEach((x, i) => {
+      els.push(<line key={`s${i}`} x1={x} y1={topY} x2={x} y2={barY} stroke={sColor} strokeWidth={revealed ? 3.5 : 2} />);
+      if (revealed) els.push(<text key={`n${i}`} x={x} y={topY - 10} fontSize={9} fontWeight={700} fill={C.reveal} textAnchor="middle" style={{ fontFamily: 'inherit' }}>{i + 1}</text>);
+    });
+    els.push(<rect key="mb" x={minX - 8} y={barY} width={(maxX - minX) + 16} height={8} rx={2} fill="#f1f5f9" stroke={C.structure} strokeWidth={1.5} />);
+    els.push(<rect key="load" x={originX - 18} y={barY + 12} width={36} height={26} rx={3} fill="#fff7ed" stroke={C.load} strokeWidth={2} />);
+    els.push(<line key="ef" x1={maxX + spacing * 0.7} y1={topY} x2={maxX + spacing * 0.7} y2={130} stroke={C.effort} strokeWidth={2} markerEnd="url(#ah-effort)" />);
+  }
+  els.push(<text key="ld" x={originX} y={198} fontSize={10} fill={C.load} textAnchor="middle" fontWeight={600} style={{ fontFamily: 'inherit' }}>{sys.load} lbs</text>);
+  if (revealed && ak) els.push(<text key="ma" x={originX} y={214} fontSize={11} fill={C.reveal} textAnchor="middle" fontWeight={700} style={{ fontFamily: 'inherit' }}>{`MA ${ak.ma} · ${ak.effort} lbs`}</text>);
+  return <g key={label}>{els}</g>;
+}
+function PulleyCompare({ config, answerKey, revealed }) {
+  return (
+    <svg viewBox="0 0 360 226" width="100%" role="img" aria-label="Two pulley systems compared">
+      <Defs />
+      {miniPulley(95, config.left, 'System A', revealed, answerKey.left)}
+      {miniPulley(265, config.right, 'System B', revealed, answerKey.right)}
+      <line x1={180} y1={40} x2={180} y2={190} stroke={C.faint} strokeWidth={1} strokeDasharray="4 4" />
+    </svg>
+  );
+}
+
 // ----------------------------------------------------------------- LEVER ------
 function Lever({ config, answerKey, revealed }) {
   const { klass, effortArm, loadArm } = config;
@@ -142,7 +187,7 @@ function Lever({ config, answerKey, revealed }) {
   const beamL = Math.min(fulcrumX, effortX, loadX) - 14;
   const beamR = Math.max(fulcrumX, effortX, loadX) + 14;
   return (
-    <svg viewBox="0 0 340 240" width="100%" role="img" aria-label={`Class ${klass} lever`}>
+    <svg viewBox="0 0 340 258" width="100%" role="img" aria-label={`Class ${klass} lever`}>
       <Defs />
       {/* beam */}
       <rect x={beamL} y={beamY - 5} width={beamR - beamL} height={10} rx={3} fill="#f1f5f9" stroke={C.structure} strokeWidth={2} />
@@ -158,13 +203,15 @@ function Lever({ config, answerKey, revealed }) {
       <line x1={effortX} y1={beamY - 40} x2={effortX} y2={beamY - 8} stroke={C.effort} strokeWidth={3} markerEnd="url(#ah-effort)" />
       <Label x={effortX} y={beamY - 46} color={C.effort} weight={700}>Effort</Label>
       {revealed && <Label x={effortX} y={beamY + 78} color={C.effort}>{effort} lbs</Label>}
-      {/* reveal: arm dimensions */}
+      {/* reveal: arm dimensions — effort arm and load arm on separate rows with
+          clear separation so the labels never crowd (they can share the fulcrum
+          endpoint and would otherwise overlap). */}
       {revealed && (
         <g>
-          <line x1={effortX} y1={beamY + 92} x2={fulcrumX} y2={beamY + 92} stroke={C.reveal} strokeWidth={1.5} markerStart="url(#ah-reveal)" markerEnd="url(#ah-reveal)" />
-          <Label x={(effortX + fulcrumX) / 2} y={beamY + 88} color={C.reveal} size={11} weight={700}>effort arm {effortArm}</Label>
-          <line x1={fulcrumX} y1={beamY + 108} x2={loadX} y2={beamY + 108} stroke={C.reveal} strokeWidth={1.5} markerStart="url(#ah-reveal)" markerEnd="url(#ah-reveal)" />
-          <Label x={(fulcrumX + loadX) / 2} y={beamY + 104} color={C.reveal} size={11} weight={700}>load arm {loadArm}</Label>
+          <line x1={effortX} y1={beamY + 86} x2={fulcrumX} y2={beamY + 86} stroke={C.reveal} strokeWidth={1.5} markerStart="url(#ah-reveal)" markerEnd="url(#ah-reveal)" />
+          <Label x={(effortX + fulcrumX) / 2} y={beamY + 82} color={C.reveal} size={10} weight={700}>effort arm {effortArm}</Label>
+          <line x1={fulcrumX} y1={beamY + 112} x2={loadX} y2={beamY + 112} stroke={C.reveal} strokeWidth={1.5} markerStart="url(#ah-reveal)" markerEnd="url(#ah-reveal)" />
+          <Label x={(fulcrumX + loadX) / 2} y={beamY + 126} color={C.reveal} size={10} weight={700}>load arm {loadArm}</Label>
         </g>
       )}
     </svg>
@@ -289,8 +336,8 @@ function Hydraulic({ config, answerKey, revealed }) {
       <line x1={outX} y1={topOutY - 14} x2={outX} y2={topOutY - 46} stroke={C.load} strokeWidth={3} markerEnd="url(#ah-load)" />
       <Label x={outX} y={topOutY - 52} color={C.load} weight={700}>F out</Label>
       <Label x={outX} y={baseY + 18} color={C.muted} size={11}>{outputArea} cm²</Label>
-      {revealed && <Label x={inX} y={topInY - 34} color={C.effort} size={11}>{inputForce} N</Label>}
-      {revealed && outputForce != null && <Label x={outX} y={topOutY - 34} color={C.load} size={11}>{outputForce} N</Label>}
+      {revealed && <Label x={inX - 20} y={topInY - 30} color={C.effort} size={11} anchor="end">{inputForce} N</Label>}
+      {revealed && outputForce != null && <Label x={outX + wOut / 2 + 6} y={topOutY - 30} color={C.load} size={11} anchor="start">{outputForce} N</Label>}
       {revealed && <Label x={170} y={232} color={C.reveal} size={12} weight={700}>MA = {outputArea} ÷ {inputArea} = {ma}</Label>}
     </svg>
   );
@@ -332,7 +379,7 @@ function Balance({ config, answerKey, revealed }) {
   );
 }
 
-const RENDERERS = { pulley: Pulley, lever: Lever, gear: Gears, belt: Belt, hydraulic: Hydraulic, balance: Balance };
+const RENDERERS = { pulley: Pulley, pulleyCompare: PulleyCompare, lever: Lever, gear: Gears, belt: Belt, hydraulic: Hydraulic, balance: Balance };
 
 // Public component. `visual` is q.visual; `revealed` gates the teaching cues.
 export default function MechanicalDiagram({ visual, revealed = false }) {
