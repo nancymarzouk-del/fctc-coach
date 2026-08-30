@@ -20,23 +20,34 @@ import RecallBoard from '../components/RecallBoard'
 import { classifyRecallDetail, recallStrategy, recordRecallMiss, focusDetailType, detailTypeToBoardKind } from '../lib/recallCoach'
 
 const DOMAIN_ICONS = { mechanical: Wrench, math: TrendingUp, reading: BookOpen, recall: Eye }
+// One calm, UALE-consistent chrome treatment for every domain — identity comes
+// from the icon and content, not from competing background colors.
 const DOMAIN_ACCENT = {
-  mechanical: { soft: 'bg-amber-50', ring: 'ring-amber-200', text: 'text-amber-700', bar: 'bg-amber-500', dot: 'bg-amber-500' },
-  math: { soft: 'bg-sky-50', ring: 'ring-sky-200', text: 'text-sky-700', bar: 'bg-sky-500', dot: 'bg-sky-500' },
-  reading: { soft: 'bg-violet-50', ring: 'ring-violet-200', text: 'text-violet-700', bar: 'bg-violet-500', dot: 'bg-violet-500' },
-  recall: { soft: 'bg-rose-50', ring: 'ring-rose-200', text: 'text-rose-700', bar: 'bg-rose-500', dot: 'bg-rose-500' },
+  mechanical: { soft: 'bg-uale-stone-100', ring: 'ring-uale-stone-200', text: 'text-uale-ink-2', icon: 'text-uale-brass-2' },
+  math: { soft: 'bg-uale-stone-100', ring: 'ring-uale-stone-200', text: 'text-uale-ink-2', icon: 'text-uale-brass-2' },
+  reading: { soft: 'bg-uale-stone-100', ring: 'ring-uale-stone-200', text: 'text-uale-ink-2', icon: 'text-uale-brass-2' },
+  recall: { soft: 'bg-uale-stone-100', ring: 'ring-uale-stone-200', text: 'text-uale-ink-2', icon: 'text-uale-brass-2' },
 }
 const SCENE_ICONS = { truck: Truck, eye: Eye, droplet: Droplet, flame: Flame, users: Users, wind: Wind, heart: Heart, check: CheckCircle2 }
 
+// Shared UALE chrome classes (buttons, card) — mirror the Florence primitives so
+// FCTC reads as the same product. Instructional diagrams keep functional colors.
+const BTN_PRIMARY = 'inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold bg-uale-cta-fill text-uale-cta-text border border-uale-cta-border hover:bg-uale-cta-hover shadow-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-uale-brass-2 focus-visible:ring-offset-2'
+const BTN_SECONDARY = 'inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold bg-uale-paper text-uale-ink-2 border border-uale-stone-200 hover:border-uale-stone-300 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-uale-brass-2 focus-visible:ring-offset-2'
+const CARD = 'rounded-2xl border border-uale-stone-200 bg-uale-card shadow-sm'
+
+// Evidence-aware mastery tone — calm, never alarming. Reserved for EVALUATED
+// skills; strong = sage, developing = brass, still-low = amber (attention, not
+// danger). Bright red is never used for routine baseline/mastery display.
 function masteryColor(m) {
-  if (m >= 0.8) return 'text-emerald-600'
-  if (m >= 0.5) return 'text-amber-600'
-  return 'text-rose-600'
+  if (m >= 0.8) return 'text-uale-sage'
+  if (m >= 0.6) return 'text-uale-brass-2'
+  return 'text-amber-700'
 }
 function barColor(m) {
-  if (m >= 0.8) return 'bg-emerald-500'
-  if (m >= 0.5) return 'bg-amber-500'
-  return 'bg-rose-500'
+  if (m >= 0.8) return 'bg-uale-sage'
+  if (m >= 0.6) return 'bg-uale-brass'
+  return 'bg-amber-400'
 }
 
 export default function App() {
@@ -257,43 +268,42 @@ export default function App() {
 
   if (page === 'login') {
     return (
-      <div className="min-h-screen bg-neutral-950 text-neutral-100 flex items-center justify-center p-6">
+      <div className="min-h-screen bg-uale-ivory text-uale-text flex items-center justify-center p-6">
         <div className="w-full max-w-md">
           <div className="flex items-center gap-3">
-            <div className="w-11 h-11 rounded-xl bg-orange-600 grid place-items-center shadow-lg shadow-orange-900/40">
-              <Flame className="w-6 h-6" />
+            <div className="w-11 h-11 rounded-xl bg-uale-brass-soft border border-uale-stone-200 grid place-items-center">
+              <Flame className="w-6 h-6 text-uale-brass-2" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold tracking-tight">FCTC Aptitude Trainer</h1>
-              <p className="text-neutral-400 text-sm">Adaptive prep that builds skill, not memorized answers</p>
+              <h1 className="font-uale-serif text-[1.7rem] font-semibold tracking-tight text-uale-ink leading-none">FCTC</h1>
+              <p className="text-uale-sec text-sm mt-0.5">Firefighter Written Test Prep</p>
             </div>
           </div>
-          <div className="mt-8 bg-neutral-900 rounded-2xl p-6 ring-1 ring-neutral-800">
-            <label className="text-sm text-neutral-300">Enter a profile name to begin</label>
+          <div className={'mt-8 p-6 ' + CARD}>
+            <label className="text-sm text-uale-ink-2 font-medium">Enter a profile name to begin</label>
             <input
               value={nameInput}
               onChange={e => setNameInput(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && login(nameInput)}
               placeholder="e.g. your name or badge number"
-              className="mt-2 w-full bg-neutral-800 rounded-lg px-4 py-3 outline-none ring-1 ring-neutral-700 focus:ring-orange-500 transition"
+              className="mt-2 w-full bg-uale-paper rounded-xl px-4 py-3 outline-none border border-uale-stone-200 text-uale-ink placeholder:text-uale-faint focus:border-uale-brass-lite transition"
             />
-            <button onClick={() => login(nameInput)}
-              className="mt-4 w-full bg-orange-600 hover:bg-orange-500 transition rounded-lg py-3 font-semibold">
+            <button onClick={() => login(nameInput)} className={'mt-4 w-full ' + BTN_PRIMARY}>
               Start training
             </button>
             {users.length > 0 && (
               <div className="mt-6">
-                <p className="text-xs uppercase tracking-wide text-neutral-500 mb-2">Continue as</p>
+                <p className="text-xs uppercase tracking-wide text-uale-faint mb-2">Continue as</p>
                 <div className="flex flex-wrap gap-2">
                   {users.map(u => (
                     <button key={u} onClick={() => login(u)}
-                      className="px-3 py-1.5 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-sm ring-1 ring-neutral-700">{u}</button>
+                      className="px-3 py-1.5 rounded-lg bg-uale-paper hover:border-uale-stone-300 text-sm border border-uale-stone-200 text-uale-ink-2">{u}</button>
                   ))}
                 </div>
               </div>
             )}
           </div>
-          <p className="text-center text-neutral-600 text-xs mt-6">Progress is saved on this device.</p>
+          <p className="text-center text-uale-faint text-xs mt-6">Progress is saved on this device.</p>
         </div>
       </div>
     )
@@ -321,21 +331,23 @@ export default function App() {
     const fresh = state.totalAnswered === 0
     // Recent improvement: only evaluated skills that are genuinely trending up
     // (the trend needs enough evidence — no decorative percentages).
-    const improving = analyzeSkills(state).filter(c => c.trend?.trend === 'improving').slice(0, 3)
+    const analysis = analyzeSkills(state)
+    const improving = analysis.filter(c => c.trend?.trend === 'improving').slice(0, 3)
+    const skillClass = {}; for (const c of analysis) skillClass[c.domain + '::' + c.subskill] = c
     const cont = state.lastActivity
 
     return (
-      <div className="min-h-screen bg-neutral-100">
-        <header className="bg-neutral-950 text-neutral-100">
-          <div className="max-w-5xl mx-auto px-6 py-5 flex items-center justify-between">
+      <div className="min-h-screen bg-uale-ivory text-uale-text">
+        <header className="bg-uale-paper border-b border-uale-stone-200">
+          <div className="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-lg bg-orange-600 grid place-items-center"><Flame className="w-5 h-5" /></div>
+              <div className="w-9 h-9 rounded-xl bg-uale-brass-soft border border-uale-stone-200 grid place-items-center"><Flame className="w-4 h-4 text-uale-brass-2" /></div>
               <div>
-                <p className="font-semibold leading-tight">FCTC Aptitude Trainer</p>
-                <p className="text-neutral-400 text-xs">Signed in as {userId}</p>
+                <p className="font-uale-serif text-[17px] font-semibold leading-tight text-uale-ink">FCTC</p>
+                <p className="text-uale-sec text-xs">Firefighter Written Test Prep · {userId}</p>
               </div>
             </div>
-            <button onClick={logout} className="flex items-center gap-2 text-sm text-neutral-300 hover:text-white">
+            <button onClick={logout} className="flex items-center gap-2 text-sm text-uale-sec hover:text-uale-ink-2">
               <LogOut className="w-4 h-4" /> Switch profile
             </button>
           </div>
@@ -345,31 +357,30 @@ export default function App() {
           {(cont || improving.length > 0) && (
             <section className="mb-4 flex flex-wrap items-center gap-3">
               {cont && (
-                <button onClick={continueActivity}
-                  className="flex items-center gap-2 bg-white ring-1 ring-neutral-200 hover:ring-orange-300 rounded-xl px-4 py-2.5 text-sm font-semibold text-neutral-800">
-                  <PlayCircle className="w-4 h-4 text-orange-500" /> Continue {cont.label}
+                <button onClick={continueActivity} className={BTN_SECONDARY}>
+                  <PlayCircle className="w-4 h-4 text-uale-brass-2" /> Continue {cont.label}
                 </button>
               )}
               {improving.map((c) => (
-                <span key={c.subskill} className="flex items-center gap-1.5 text-xs font-medium text-emerald-700 bg-emerald-50 ring-1 ring-emerald-200 rounded-full px-3 py-1.5">
+                <span key={c.subskill} className="flex items-center gap-1.5 text-xs font-medium text-uale-sage bg-uale-sage-soft ring-1 ring-uale-sage-chip rounded-full px-3 py-1.5">
                   <TrendingUp className="w-3.5 h-3.5" /> {c.subskillLabel} improving
                 </span>
               ))}
             </section>
           )}
           <section className="grid md:grid-cols-3 gap-4">
-            <div className="md:col-span-2 bg-white rounded-2xl p-6 ring-1 ring-neutral-200">
-              <div className="flex items-center gap-2 text-neutral-500 text-sm"><Gauge className="w-4 h-4" /> Readiness score</div>
+            <div className={'md:col-span-2 p-6 ' + CARD}>
+              <div className="flex items-center gap-2 text-uale-faint text-xs font-semibold uppercase tracking-wide"><Gauge className="w-4 h-4" /> Readiness</div>
               {readyInfo.sufficientEvidence ? (
                 <>
                   <div className="mt-2 flex items-end gap-3">
-                    <span className="text-6xl font-bold tracking-tight text-neutral-900">{ready}</span>
-                    <span className="text-neutral-400 mb-2">/ 100</span>
+                    <span className="font-uale-serif text-6xl font-semibold tracking-tight text-uale-ink">{ready}</span>
+                    <span className="text-uale-faint mb-2">/ 100</span>
                   </div>
-                  <div className="mt-4 h-2 rounded-full bg-neutral-200 overflow-hidden">
-                    <div className="h-full bg-orange-600 transition-all" style={{ width: ready + '%' }} />
+                  <div className="mt-4 h-2 rounded-full bg-uale-stone-100 overflow-hidden">
+                    <div className="h-full bg-uale-brass transition-all" style={{ width: ready + '%' }} />
                   </div>
-                  <p className="mt-3 text-sm text-neutral-600">
+                  <p className="mt-3 text-sm text-uale-sec">
                     Based on the {readyInfo.evaluatedCount} skill{readyInfo.evaluatedCount === 1 ? '' : 's'} you've
                     practiced enough to measure (of {readyInfo.totalCount}). It weights your weakest evaluated
                     skill{readyInfo.weakestLabel ? ' (' + readyInfo.weakestLabel + ')' : ''}, so balanced practice moves it fastest.
@@ -377,37 +388,32 @@ export default function App() {
                 </>
               ) : (
                 <>
-                  <div className="mt-2 flex items-end gap-3">
-                    <span className="text-4xl font-bold tracking-tight text-neutral-400">Building your baseline</span>
-                  </div>
-                  <p className="mt-3 text-sm text-neutral-600">
+                  <p className="mt-2 font-uale-serif text-[2rem] font-semibold leading-tight tracking-tight text-uale-ink">Building your baseline</p>
+                  <p className="mt-2 text-sm text-uale-sec [text-wrap:pretty]">
                     {fresh
-                      ? 'Run the diagnostic so the coach can measure your strengths and gaps.'
-                      : `You've practiced ${readyInfo.evaluatedCount} of ${readyInfo.totalCount} skills enough to measure. A readiness score appears once there's enough evidence to make it honest — no guesses.`}
+                      ? "We're learning how you learn. Take a short diagnostic and your readiness score appears once it's honest — no guesses."
+                      : "We're learning how you learn — practice a little in each area and your readiness score appears once there's enough evidence to make it meaningful."}
                   </p>
+                  {!fresh && (
+                    <span className="mt-3 inline-flex items-center gap-1.5 text-xs font-medium text-uale-brass-2 bg-uale-brass-soft rounded-full px-3 py-1.5">
+                      {readyInfo.evaluatedCount} of {readyInfo.totalCount} skills evaluated
+                    </span>
+                  )}
                 </>
               )}
             </div>
-            <div className="bg-white rounded-2xl p-6 ring-1 ring-neutral-200 flex flex-col">
-              <div className="flex items-center gap-2 text-neutral-500 text-sm"><Target className="w-4 h-4" /> What to work on next</div>
+            <div className={'p-6 flex flex-col ' + CARD}>
+              <div className="flex items-center gap-2 text-uale-faint text-xs font-semibold uppercase tracking-wide"><Target className="w-4 h-4" /> Recommended next</div>
               <div className="mt-3 flex-1">
-                <div className="flex items-start gap-2">
-                  <Lightbulb className="w-4 h-4 text-orange-500 shrink-0 mt-1" />
-                  <div>
-                    <p className="text-sm font-semibold text-neutral-900">{nba.title}</p>
-                    <p className="mt-1 text-sm text-neutral-600">{nba.why}</p>
-                  </div>
-                </div>
-                {recs.length > 1 && (
-                  <div className="mt-3 pt-3 border-t border-neutral-100 space-y-1.5">
-                    {recs.slice(0, 2).map((r, i) => (
-                      <p key={i} className="text-xs text-neutral-500 leading-snug">{r.text}</p>
-                    ))}
-                  </div>
+                <p className="font-uale-serif text-[1.4rem] font-semibold leading-snug text-uale-ink [text-wrap:pretty]">
+                  {nba.skill?.subskillLabel || nba.title}
+                </p>
+                <p className="mt-1.5 text-sm text-uale-sec leading-relaxed [text-wrap:pretty]">{nba.why}</p>
+                {improving.length > 0 && (nba.skill?.subskill !== improving[0].subskill) && (
+                  <p className="mt-3 text-xs text-uale-sage flex items-center gap-1.5"><TrendingUp className="w-3.5 h-3.5" /> {improving[0].subskillLabel} {improving.length > 1 ? 'and others are' : 'is'} improving.</p>
                 )}
               </div>
-              <button onClick={fresh ? startDiagnostic : startNextBestAction}
-                className="mt-4 w-full bg-neutral-900 hover:bg-neutral-800 text-white rounded-lg py-2.5 text-sm font-semibold flex items-center justify-center gap-2">
+              <button onClick={fresh ? startDiagnostic : startNextBestAction} className={'mt-4 w-full ' + BTN_PRIMARY}>
                 {fresh ? 'Start diagnostic' : (nba.kind === 'weak' && nba.domain === 'mechanical' ? 'Start guided practice' : 'Start practice')} <ChevronRight className="w-4 h-4" />
               </button>
             </div>
@@ -415,92 +421,95 @@ export default function App() {
 
           <section className="mt-4 grid md:grid-cols-2 gap-4">
             <button onClick={startRecallDrill}
-              className="text-left rounded-2xl p-5 ring-1 ring-neutral-800 bg-neutral-900 text-neutral-100 hover:bg-neutral-800 transition flex items-center justify-between">
+              className={'text-left p-5 flex items-center justify-between transition hover:-translate-y-0.5 hover:shadow-md ' + CARD}>
               <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-xl bg-rose-600/20 text-rose-400 grid place-items-center">
-                  <PlayCircle className="w-6 h-6" />
+                <div className="w-12 h-12 rounded-xl bg-uale-lav-soft grid place-items-center">
+                  <PlayCircle className="w-6 h-6 text-uale-lav" />
                 </div>
                 <div>
-                  <p className="font-semibold">Visual Recall Drill</p>
-                  <p className="text-neutral-400 text-sm">Study an operational board, then recall the details from memory.</p>
+                  <p className="font-uale-serif text-[17px] font-semibold text-uale-ink">Visual Recall Drill</p>
+                  <p className="text-uale-sec text-sm">Study an operational board, then recall the details from memory.</p>
                 </div>
               </div>
-              <ChevronRight className="w-5 h-5 text-neutral-500" />
+              <ChevronRight className="w-5 h-5 text-uale-faint" />
             </button>
             <button onClick={() => setPage('mock')}
-              className="text-left rounded-2xl p-5 ring-1 ring-orange-200 bg-orange-50 hover:bg-orange-100 transition flex items-center justify-between">
+              className={'text-left p-5 flex items-center justify-between transition hover:-translate-y-0.5 hover:shadow-md ' + CARD}>
               <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-xl bg-orange-600 text-white grid place-items-center">
-                  <Gauge className="w-6 h-6" />
+                <div className="w-12 h-12 rounded-xl bg-uale-brass-soft grid place-items-center">
+                  <Gauge className="w-6 h-6 text-uale-brass-2" />
                 </div>
                 <div>
-                  <p className="font-semibold text-neutral-900">Full Mock Exam</p>
-                  <p className="text-neutral-600 text-sm">
+                  <p className="font-uale-serif text-[17px] font-semibold text-uale-ink">Full Mock Exam</p>
+                  <p className="text-uale-sec text-sm">
                     {state.lastMock
                       ? `Last score ${state.lastMock.pct}% (${state.lastMock.correct}/${state.lastMock.total}). Take another to track progress.`
                       : '100 questions · 2.5-hour timer · mixed areas, with a full breakdown.'}
                   </p>
                 </div>
               </div>
-              <ChevronRight className="w-5 h-5 text-orange-400" />
+              <ChevronRight className="w-5 h-5 text-uale-faint" />
             </button>
           </section>
 
           <section className="mt-8">
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-neutral-500 mb-3">Category Performance</h2>
+            <h2 className="text-xs font-semibold uppercase tracking-wide text-uale-faint mb-3">Category performance</h2>
             <div className="grid sm:grid-cols-2 gap-4">
               {Object.entries(SUBSKILLS).map(([dKey, dDef]) => {
                 const Icon = DOMAIN_ICONS[dKey]
-                const accent = DOMAIN_ACCENT[dKey]
-                const m = domainMastery(state, dKey)
                 const cs = categoryStats(state, dKey)
+                // Only surface a headline % once at least one subskill here is
+                // actually evaluated — otherwise it's still an early baseline.
+                const evalCount = Object.keys(dDef.subskills).filter(sk => skillClass[dKey + '::' + sk]?.evidenceState === 'evaluated').length
                 return (
-                  <div key={dKey} className="rounded-2xl ring-1 ring-neutral-200 bg-white overflow-hidden">
-                    <div className={'px-5 py-4 ' + accent.soft}>
+                  <div key={dKey} className={'overflow-hidden ' + CARD}>
+                    <div className="px-5 py-4 border-b border-uale-stone-100">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
-                          <div className={'w-9 h-9 rounded-lg bg-white grid place-items-center ' + accent.text}><Icon className="w-5 h-5" /></div>
-                          <p className="font-semibold text-neutral-900">{dDef.label}</p>
+                          <div className="w-9 h-9 rounded-xl bg-uale-stone-100 grid place-items-center text-uale-brass-2"><Icon className="w-5 h-5" /></div>
+                          <p className="font-uale-serif text-[16px] font-semibold text-uale-ink">{dDef.label}</p>
                         </div>
-                        {cs.started
-                          ? <span className={'text-sm font-bold ' + masteryColor(cs.pct / 100)}>{cs.pct}%</span>
-                          : <span className="text-xs font-medium text-neutral-400">Not started</span>}
+                        {evalCount >= 1
+                          ? <span className={'text-sm font-semibold ' + masteryColor(cs.pct / 100)}>{cs.pct}%</span>
+                          : cs.started
+                            ? <span className="text-xs font-medium text-uale-brass-2">Early baseline</span>
+                            : <span className="text-xs font-medium text-uale-faint">Not started</span>}
                       </div>
-                      {/* Real category stats — updates after every session */}
-                      <div className="mt-2 flex items-center gap-3 text-xs text-neutral-600">
+                      <div className="mt-2 flex items-center gap-2 text-xs text-uale-sec">
                         {cs.started ? (
                           <>
                             <span>{cs.correct}/{cs.attempted} correct</span>
-                            <span className="text-neutral-300">·</span>
-                            <span>{cs.sessions} session{cs.sessions === 1 ? '' : 's'}</span>
-                            <span className="text-neutral-300">·</span>
-                            <span>Last: <span className={'font-semibold ' + masteryColor((cs.lastScore ?? 0) / 100)}>{cs.lastScore}%</span></span>
+                            <span className="text-uale-stone-300">·</span>
+                            <span>{evalCount} of {Object.keys(dDef.subskills).length} skills evaluated</span>
                           </>
                         ) : (
-                          <span className="text-neutral-400">0 questions completed</span>
+                          <span className="text-uale-faint">Not enough evidence yet — a short set maps where you stand</span>
                         )}
                       </div>
                     </div>
                     <div className="px-5 py-4 space-y-2.5">
                       {Object.entries(dDef.subskills).map(([skKey, skDef]) => {
                         const s = state.domains[dKey][skKey]
+                        const c = skillClass[dKey + '::' + skKey]
+                        const ev = c?.evidenceState
                         const sm = subskillMastery(s)
                         return (
                           <div key={skKey} className="flex items-center gap-3">
-                            <span className="text-xs text-neutral-600 w-32 shrink-0 truncate">{skDef.label}</span>
-                            <div className="flex-1 h-1.5 rounded-full bg-neutral-100 overflow-hidden">
-                              <div className={'h-full ' + barColor(sm) + ' transition-all'} style={{ width: Math.round(sm * 100) + '%' }} />
+                            <span className="text-xs text-uale-sec w-32 shrink-0 truncate">{skDef.label}</span>
+                            <div className="flex-1 h-1.5 rounded-full bg-uale-stone-100 overflow-hidden">
+                              {ev === 'evaluated' && <div className={'h-full ' + barColor(sm) + ' transition-all'} style={{ width: Math.round(sm * 100) + '%' }} />}
                             </div>
-                            <span className={'text-xs font-medium w-12 text-right ' + (s.attempts ? masteryColor(sm) : 'text-neutral-300')}>
-                              {s.attempts ? Math.round(sm * 100) + '%' : '—'}
-                            </span>
+                            {ev === 'evaluated'
+                              ? <span className={'text-xs font-medium w-16 text-right ' + masteryColor(sm)}>{Math.round(sm * 100)}%</span>
+                              : ev === 'insufficient'
+                                ? <span className="text-[11px] font-medium w-16 text-right text-uale-brass-2">Building</span>
+                                : <span className="text-xs font-medium w-16 text-right text-uale-faint">—</span>}
                           </div>
                         )
                       })}
                     </div>
                     <div className="px-5 pb-4">
-                      <button onClick={() => startDomain(dKey)}
-                        className={'w-full text-sm font-medium rounded-lg py-2 ' + accent.soft + ' ' + accent.text + ' hover:opacity-80 transition'}>
+                      <button onClick={() => startDomain(dKey)} className={'w-full ' + BTN_SECONDARY}>
                         Practice {dDef.label}
                       </button>
                     </div>
@@ -511,33 +520,32 @@ export default function App() {
           </section>
 
           {!fresh && (
-            <section className="mt-8 bg-white rounded-2xl ring-1 ring-neutral-200 p-6">
-              <h2 className="text-sm font-semibold uppercase tracking-wide text-neutral-500 mb-4">Focus areas</h2>
+            <section className={'mt-8 p-6 ' + CARD}>
+              <h2 className="text-xs font-semibold uppercase tracking-wide text-uale-faint mb-4">Focus areas</h2>
               <div className="space-y-3">
                 {weak.map((w, i) => (
                   <div key={i} className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm font-medium text-neutral-800">{w.subskillLabel}
-                        <span className="text-neutral-400 font-normal"> · {w.domainLabel}</span></p>
-                      <p className="text-xs text-neutral-500">
-                        {w.untouched ? 'Not started yet' : w.due ? 'Due for spaced review' : 'Mastery ' + Math.round(w.mastery * 100) + '% · difficulty ' + w.difficulty + '/5'}
+                      <p className="text-sm font-medium text-uale-ink-2">{w.subskillLabel}
+                        <span className="text-uale-faint font-normal"> · {w.domainLabel}</span></p>
+                      <p className="text-xs text-uale-sec">
+                        {w.untouched ? 'Not started yet' : w.due ? 'Due for spaced review' : w.evidenceState === 'insufficient' ? 'Building evidence · keep practicing' : 'Mastery ' + Math.round(w.mastery * 100) + '% · difficulty ' + w.difficulty + '/5'}
                       </p>
                     </div>
-                    <div className="w-24 h-1.5 rounded-full bg-neutral-200 overflow-hidden">
-                      <div className={'h-full ' + barColor(w.mastery)} style={{ width: Math.round(w.mastery * 100) + '%' }} />
+                    <div className="w-24 h-1.5 rounded-full bg-uale-stone-100 overflow-hidden">
+                      {w.evidenceState === 'evaluated' && <div className={'h-full ' + barColor(w.mastery)} style={{ width: Math.round(w.mastery * 100) + '%' }} />}
                     </div>
                   </div>
                 ))}
               </div>
-              <button onClick={startTargeted}
-                className="mt-5 w-full bg-orange-600 hover:bg-orange-500 text-white rounded-lg py-2.5 text-sm font-semibold">
+              <button onClick={startTargeted} className={'mt-5 w-full ' + BTN_PRIMARY}>
                 Practice my weakest subskills
               </button>
             </section>
           )}
 
           <div className="mt-8 flex justify-end">
-            <button onClick={resetProgress} className="text-xs text-neutral-400 hover:text-rose-600 flex items-center gap-1">
+            <button onClick={resetProgress} className="text-xs text-uale-faint hover:text-rose-600 flex items-center gap-1">
               <RotateCcw className="w-3.5 h-3.5" /> Reset progress
             </button>
           </div>
@@ -551,15 +559,15 @@ export default function App() {
     const accent = DOMAIN_ACCENT[q.domain]
     const progress = ((qIndex + (revealed ? 1 : 0)) / queue.length) * 100
     return (
-      <div className="min-h-screen bg-neutral-100">
-        <header className="bg-white ring-1 ring-neutral-200 sticky top-0 z-10">
+      <div className="min-h-screen bg-uale-ivory text-uale-text">
+        <header className="bg-uale-paper border-b border-uale-stone-200 sticky top-0 z-10">
           <div className="max-w-3xl mx-auto px-6 py-3">
             <div className="flex items-center justify-between text-sm">
-              <span className="font-medium text-neutral-700">{sessionLabel}</span>
-              <span className="text-neutral-500">{qIndex + 1} / {queue.length}</span>
+              <span className="font-medium text-uale-ink-2">{sessionLabel}</span>
+              <span className="text-uale-sec">{qIndex + 1} / {queue.length}</span>
             </div>
-            <div className="mt-2 h-1.5 rounded-full bg-neutral-200 overflow-hidden">
-              <div className="h-full bg-orange-600 transition-all" style={{ width: progress + '%' }} />
+            <div className="mt-2 h-1.5 rounded-full bg-uale-stone-100 overflow-hidden">
+              <div className="h-full bg-uale-brass transition-all" style={{ width: progress + '%' }} />
             </div>
           </div>
         </header>
@@ -575,20 +583,20 @@ export default function App() {
             <pre className="whitespace-pre-wrap text-sm bg-neutral-900 text-neutral-100 rounded-xl p-4 mb-5 font-mono leading-relaxed">{q.passage}</pre>
           )}
           {q.mode === 'guided' && (
-            <div className="mb-4 flex items-center gap-2 text-xs font-semibold text-orange-700 bg-orange-50 ring-1 ring-orange-200 rounded-lg px-3 py-2">
+            <div className="mb-4 flex items-center gap-2 text-xs font-semibold text-uale-brass-2 bg-uale-brass-soft ring-1 ring-uale-stone-200 rounded-lg px-3 py-2">
               <Lightbulb className="w-4 h-4 shrink-0" /> Guided example — study how it works, then you'll try one yourself.
             </div>
           )}
           <h2 className="text-xl font-semibold text-neutral-900 mb-5">{q.prompt}</h2>
           {q.visual && <MechanicalDiagram visual={q.visual} revealed={q.mode === 'guided' ? true : revealed} />}
           {q.mode === 'guided' ? (
-            <div className="bg-white ring-1 ring-neutral-200 rounded-xl p-4">
+            <div className="bg-uale-card border border-uale-stone-200 rounded-xl p-4 shadow-sm">
               <div className="flex items-center gap-2 text-sm font-semibold text-neutral-700 mb-1">
-                <Lightbulb className="w-4 h-4 text-orange-500" /> The rule
+                <Lightbulb className="w-4 h-4 text-uale-brass-2" /> The rule
               </div>
               <p className="text-sm text-neutral-700 leading-relaxed">{q.explanation}</p>
               <button onClick={nextQuestion}
-                className="mt-4 w-full bg-neutral-900 hover:bg-neutral-800 text-white rounded-lg py-3 font-semibold flex items-center justify-center gap-2">
+                className="mt-4 w-full bg-uale-cta-fill text-uale-cta-text border border-uale-cta-border hover:bg-uale-cta-hover shadow-sm rounded-lg py-3 font-semibold flex items-center justify-center gap-2">
                 {q.guidance || 'Try one yourself'} <ChevronRight className="w-4 h-4" />
               </button>
             </div>
@@ -601,7 +609,7 @@ export default function App() {
                 {q.options.map((opt, idx) => {
                   const isCorrect = idx === q.correct
                   const isPicked = idx === selected
-                  let cls = 'border-neutral-200 hover:border-orange-400 hover:bg-orange-50'
+                  let cls = 'border-uale-stone-200 hover:border-uale-brass-lite hover:bg-uale-brass-soft'
                   if (revealed && isCorrect) cls = 'border-emerald-500 bg-emerald-50'
                   else if (revealed && isPicked && !isCorrect) cls = 'border-rose-500 bg-rose-50'
                   else if (revealed) cls = 'border-neutral-200 opacity-60'
@@ -616,19 +624,19 @@ export default function App() {
                 })}
               </div>
               {revealed && (
-                <div className="mt-5 bg-white ring-1 ring-neutral-200 rounded-xl p-4">
+                <div className="mt-5 bg-uale-card border border-uale-stone-200 rounded-xl p-4 shadow-sm">
                   <div className="flex items-center gap-2 text-sm font-semibold text-neutral-700 mb-1">
-                    <Lightbulb className="w-4 h-4 text-orange-500" /> Why
+                    <Lightbulb className="w-4 h-4 text-uale-brass-2" /> Why
                   </div>
                   {selected != null && selected !== q.correct && q.meta?.diagnostics?.[q.options[selected]] && (
                     <p className="text-sm text-rose-700 bg-rose-50 rounded-lg px-3 py-2 mb-2 leading-relaxed">{q.meta.diagnostics[q.options[selected]]}</p>
                   )}
                   <p className="text-sm text-neutral-700 leading-relaxed">{q.explanation}</p>
                   {q.meta?.strategy && (
-                    <p className="mt-2 text-sm text-sky-800 bg-sky-50 rounded-lg px-3 py-2 leading-relaxed">{q.meta.strategy}</p>
+                    <p className="mt-2 text-sm text-uale-ink-2 bg-uale-lav-soft rounded-lg px-3 py-2 leading-relaxed">{q.meta.strategy}</p>
                   )}
                   <button onClick={nextQuestion}
-                    className="mt-4 w-full bg-neutral-900 hover:bg-neutral-800 text-white rounded-lg py-3 font-semibold flex items-center justify-center gap-2">
+                    className="mt-4 w-full bg-uale-cta-fill text-uale-cta-text border border-uale-cta-border hover:bg-uale-cta-hover shadow-sm rounded-lg py-3 font-semibold flex items-center justify-center gap-2">
                     {qIndex + 1 < queue.length ? 'Next question' : 'See results'} <ChevronRight className="w-4 h-4" />
                   </button>
                 </div>
@@ -822,22 +830,22 @@ export default function App() {
     const q = queue[qIndex]
     const progress = ((qIndex + (revealed ? 1 : 0)) / queue.length) * 100
     return (
-      <div className="min-h-screen bg-neutral-100">
+      <div className="min-h-screen bg-uale-ivory text-uale-text">
         <header className="bg-white ring-1 ring-neutral-200 sticky top-0 z-10">
           <div className="max-w-3xl mx-auto px-6 py-3">
             <div className="flex items-center justify-between text-sm">
-              <span className="font-medium text-neutral-700 flex items-center gap-2"><Eye className="w-4 h-4 text-rose-500" /> Recall — what did you observe?</span>
+              <span className="font-medium text-neutral-700 flex items-center gap-2"><Eye className="w-4 h-4 text-uale-brass-2" /> Recall — what did you observe?</span>
               <span className="text-neutral-500">{qIndex + 1} / {queue.length}</span>
             </div>
             <div className="mt-2 h-1.5 rounded-full bg-neutral-200 overflow-hidden">
-              <div className="h-full bg-rose-500 transition-all" style={{ width: progress + '%' }} />
+              <div className="h-full bg-uale-brass transition-all" style={{ width: progress + '%' }} />
             </div>
           </div>
         </header>
 
         <main key={q.id} className="max-w-3xl mx-auto px-6 py-8">
           <div className="flex items-center gap-2 mb-4">
-            <span className="text-xs px-2 py-1 rounded-full bg-rose-50 text-rose-700 ring-1 ring-rose-200">
+            <span className="text-xs px-2 py-1 rounded-full bg-uale-stone-100 text-uale-ink-2 ring-1 ring-uale-stone-200">
               Recall · {SUBSKILLS.recall.subskills[q.subskill]?.label || q.subskill}
             </span>
           </div>
@@ -847,7 +855,7 @@ export default function App() {
             {q.options.map((opt, idx) => {
               const isCorrect = idx === q.correct
               const isPicked = idx === selected
-              let cls = 'border-neutral-200 hover:border-rose-400 hover:bg-rose-50'
+              let cls = 'border-uale-stone-200 hover:border-uale-brass-lite hover:bg-uale-brass-soft'
               if (revealed && isCorrect) cls = 'border-emerald-500 bg-emerald-50'
               else if (revealed && isPicked && !isCorrect) cls = 'border-rose-500 bg-rose-50'
               else if (revealed) cls = 'border-neutral-200 opacity-60'
@@ -862,13 +870,13 @@ export default function App() {
             })}
           </div>
           {revealed && (
-            <div className="mt-5 bg-white ring-1 ring-neutral-200 rounded-xl p-4">
+            <div className="mt-5 bg-uale-card border border-uale-stone-200 rounded-xl p-4 shadow-sm">
               <div className="flex items-center gap-2 text-sm font-semibold text-neutral-700 mb-1">
-                <Lightbulb className="w-4 h-4 text-rose-500" /> Recall check
+                <Lightbulb className="w-4 h-4 text-uale-brass-2" /> Recall check
               </div>
               <p className="text-sm text-neutral-700 leading-relaxed">{q.explanation}</p>
               {q.meta?.recallStrategy && (
-                <p className="mt-2 text-sm text-sky-800 bg-sky-50 rounded-lg px-3 py-2 leading-relaxed">{q.meta.recallStrategy}</p>
+                <p className="mt-2 text-sm text-uale-ink-2 bg-uale-lav-soft rounded-lg px-3 py-2 leading-relaxed">{q.meta.recallStrategy}</p>
               )}
               {scenario && (
                 <div className="mt-3">
@@ -877,7 +885,7 @@ export default function App() {
                 </div>
               )}
               <button onClick={nextRecall}
-                className="mt-4 w-full bg-neutral-900 hover:bg-neutral-800 text-white rounded-lg py-3 font-semibold flex items-center justify-center gap-2">
+                className="mt-4 w-full bg-uale-cta-fill text-uale-cta-text border border-uale-cta-border hover:bg-uale-cta-hover shadow-sm rounded-lg py-3 font-semibold flex items-center justify-center gap-2">
                 {qIndex + 1 < queue.length ? 'Next question' : 'See results'} <ChevronRight className="w-4 h-4" />
               </button>
             </div>
@@ -908,14 +916,14 @@ export default function App() {
     const weakOverall = weakAreas(state, 3)
 
     return (
-      <div className="min-h-screen bg-neutral-100">
+      <div className="min-h-screen bg-uale-ivory text-uale-text">
         <main className="max-w-2xl mx-auto px-6 py-12">
           <div className="bg-white rounded-2xl ring-1 ring-neutral-200 p-8 text-center">
             <p className="text-sm text-neutral-500">{sessionLabel} complete</p>
             <p className="text-6xl font-bold text-neutral-900 mt-2">{pct}%</p>
             <p className="text-neutral-600 mt-1">{correct} of {sessionLog.length} correct</p>
-            <div className="mt-6 inline-flex items-center gap-2 text-sm bg-neutral-100 rounded-full px-4 py-2">
-              <Gauge className="w-4 h-4 text-orange-500" />
+            <div className="mt-6 inline-flex items-center gap-2 text-sm bg-uale-stone-100 rounded-full px-4 py-2">
+              <Gauge className="w-4 h-4 text-uale-brass-2" />
               {readyInfo.sufficientEvidence
                 ? `Readiness now ${readyInfo.score}/100`
                 : `Building your baseline — ${readyInfo.evaluatedCount}/${readyInfo.totalCount} skills measured`}
@@ -966,7 +974,7 @@ export default function App() {
 
           <div className="mt-6 flex gap-3">
             <button onClick={() => setPage('dashboard')}
-              className="flex-1 bg-neutral-900 hover:bg-neutral-800 text-white rounded-xl py-3 font-semibold">
+              className="flex-1 bg-uale-cta-fill text-uale-cta-text border border-uale-cta-border hover:bg-uale-cta-hover shadow-sm rounded-xl py-3 font-semibold">
               Back to dashboard
             </button>
             {sessionLabel === 'Visual Recall Drill' ? (
@@ -976,7 +984,7 @@ export default function App() {
               </button>
             ) : (
               <button onClick={startTargeted}
-                className="flex-1 bg-orange-600 hover:bg-orange-500 text-white rounded-xl py-3 font-semibold">
+                className="flex-1 bg-uale-cta-fill text-uale-cta-text border border-uale-cta-border hover:bg-uale-cta-hover shadow-sm rounded-xl py-3 font-semibold">
                 Practice weak areas
               </button>
             )}

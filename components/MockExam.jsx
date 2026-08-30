@@ -122,40 +122,40 @@ export default function MockExam({ state, onCommit, onRemediate, onTargeted, onE
     const weakest = graded.slice(0, 3);
     const strongest = [...graded].reverse().slice(0, 3);
     return (
-      <div className="min-h-screen bg-neutral-100">
+      <div className="min-h-screen bg-uale-ivory text-uale-text">
         <main className="max-w-3xl mx-auto px-6 py-10">
-          <div className="bg-white rounded-2xl ring-1 ring-neutral-200 p-8 text-center">
-            <p className="text-sm text-neutral-500">Mock exam complete</p>
-            <p className="text-6xl font-bold text-neutral-900 mt-2">{results.pct}%</p>
-            <p className="text-neutral-600 mt-1">{results.correct} of {results.total} correct · {results.answered} answered · {fmtTime(EXAM_SECONDS - timeLeft)} used</p>
-            <p className="mt-2 text-xs text-neutral-400">Balanced practice distribution — not official FCTC section weighting.</p>
+          <div className="bg-uale-card border border-uale-stone-200 rounded-2xl shadow-sm p-8 text-center">
+            <p className="text-sm text-uale-sec">Mock exam complete</p>
+            <p className="font-uale-serif text-6xl font-semibold text-uale-ink mt-2">{results.pct}%</p>
+            <p className="text-uale-sec mt-1">{results.correct} of {results.total} correct · {results.answered} answered · {fmtTime(EXAM_SECONDS - timeLeft)} used</p>
+            <p className="mt-2 text-xs text-uale-faint">Balanced practice distribution — not official FCTC section weighting.</p>
           </div>
 
           {/* Post-mock next action */}
-          <div className="mt-6 bg-neutral-900 text-neutral-100 rounded-2xl p-6">
-            <div className="flex items-center gap-2 text-orange-400 text-sm font-semibold"><Target className="w-4 h-4" /> Your biggest opportunity</div>
-            <p className="mt-2 text-lg font-semibold">{nba.title}</p>
-            <p className="mt-1 text-sm text-neutral-300">{nba.why}</p>
+          <div className="mt-6 bg-uale-hero-3 text-uale-cream rounded-2xl p-6">
+            <div className="flex items-center gap-2 text-uale-champagne text-xs font-semibold uppercase tracking-wide"><Target className="w-4 h-4" /> Your biggest opportunity</div>
+            <p className="mt-2 font-uale-serif text-[1.4rem] font-semibold text-white">{nba.skill?.subskillLabel || nba.title}</p>
+            <p className="mt-1 text-sm text-uale-cream-dim">{nba.why}</p>
             <div className="mt-4 flex flex-wrap gap-3">
               {nba.domain === 'mechanical' && nba.subskill && (nba.kind === 'weak' || nba.kind === 'build')
-                ? <button onClick={() => onRemediate(nba.domain, nba.subskill)} className="bg-orange-600 hover:bg-orange-500 text-white rounded-lg px-4 py-2.5 text-sm font-semibold flex items-center gap-2"><Lightbulb className="w-4 h-4" /> Start guided practice</button>
-                : <button onClick={onTargeted} className="bg-orange-600 hover:bg-orange-500 text-white rounded-lg px-4 py-2.5 text-sm font-semibold flex items-center gap-2"><Target className="w-4 h-4" /> Start targeted practice</button>}
-              <button onClick={onExit} className="bg-neutral-800 hover:bg-neutral-700 text-neutral-200 rounded-lg px-4 py-2.5 text-sm font-semibold">Back to dashboard</button>
+                ? <button onClick={() => onRemediate(nba.domain, nba.subskill)} className="bg-uale-cta-fill text-uale-cta-text border border-uale-cta-border hover:bg-uale-cta-hover rounded-xl px-4 py-2.5 text-sm font-semibold flex items-center gap-2"><Lightbulb className="w-4 h-4" /> Start guided practice</button>
+                : <button onClick={onTargeted} className="bg-uale-cta-fill text-uale-cta-text border border-uale-cta-border hover:bg-uale-cta-hover rounded-xl px-4 py-2.5 text-sm font-semibold flex items-center gap-2"><Target className="w-4 h-4" /> Start targeted practice</button>}
+              <button onClick={onExit} className="bg-white/10 hover:bg-white/20 text-uale-cream border border-white/15 rounded-xl px-4 py-2.5 text-sm font-semibold">Back to dashboard</button>
             </div>
           </div>
 
           {/* Domain breakdown */}
-          <div className="mt-6 bg-white rounded-2xl ring-1 ring-neutral-200 p-6">
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-neutral-500 mb-4">By area</h2>
+          <div className="mt-6 bg-uale-card border border-uale-stone-200 rounded-2xl shadow-sm p-6">
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-uale-sec mb-4">By area</h2>
             <div className="grid sm:grid-cols-3 gap-4">
               {domOrder.filter((d) => results.byDomain[d]).map((d) => {
                 const b = results.byDomain[d];
                 const pct = Math.round((b.c / b.n) * 100);
                 return (
-                  <div key={d} className="rounded-xl ring-1 ring-neutral-200 p-4">
-                    <p className="text-sm font-medium text-neutral-800">{SUBSKILLS[d]?.label || d}</p>
-                    <p className="text-3xl font-bold text-neutral-900 mt-1">{pct}%</p>
-                    <p className="text-xs text-neutral-500">{b.c}/{b.n} correct</p>
+                  <div key={d} className="rounded-xl border border-uale-stone-200 p-4">
+                    <p className="text-sm font-medium text-uale-ink-2">{SUBSKILLS[d]?.label || d}</p>
+                    <p className="font-uale-serif text-3xl font-semibold text-uale-ink mt-1">{pct}%</p>
+                    <p className="text-xs text-uale-sec">{b.c}/{b.n} correct</p>
                   </div>
                 );
               })}
@@ -164,31 +164,31 @@ export default function MockExam({ state, onCommit, onRemediate, onTargeted, onE
 
           {/* Strengths / weaknesses */}
           <div className="mt-6 grid sm:grid-cols-2 gap-4">
-            <div className="bg-white rounded-2xl ring-1 ring-neutral-200 p-6">
-              <h3 className="text-sm font-semibold text-emerald-700 mb-3">Strongest skills</h3>
+            <div className="bg-uale-card border border-uale-stone-200 rounded-2xl shadow-sm p-6">
+              <h3 className="text-sm font-semibold text-uale-sage mb-3">Strongest skills</h3>
               {strongest.map((r) => (
-                <div key={r.label} className="flex justify-between text-sm py-1"><span className="text-neutral-700">{r.label}</span><span className="font-semibold text-emerald-600">{r.pct}%</span></div>
+                <div key={r.label} className="flex justify-between text-sm py-1"><span className="text-uale-ink-2">{r.label}</span><span className="font-semibold text-uale-sage">{r.pct}%</span></div>
               ))}
             </div>
-            <div className="bg-white rounded-2xl ring-1 ring-neutral-200 p-6">
-              <h3 className="text-sm font-semibold text-rose-700 mb-3">Focus next</h3>
+            <div className="bg-uale-card border border-uale-stone-200 rounded-2xl shadow-sm p-6">
+              <h3 className="text-sm font-semibold text-amber-700 mb-3">Focus next</h3>
               {weakest.map((r) => (
-                <div key={r.label} className="flex justify-between text-sm py-1"><span className="text-neutral-700">{r.label} <span className="text-neutral-400">· {r.domainLabel}</span></span><span className="font-semibold text-rose-600">{r.pct}%</span></div>
+                <div key={r.label} className="flex justify-between text-sm py-1"><span className="text-uale-ink-2">{r.label} <span className="text-uale-faint">· {r.domainLabel}</span></span><span className="font-semibold text-amber-700">{r.pct}%</span></div>
               ))}
             </div>
           </div>
 
           {/* Full subskill breakdown */}
-          <div className="mt-6 bg-white rounded-2xl ring-1 ring-neutral-200 p-6">
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-neutral-500 mb-4">Every subskill</h2>
+          <div className="mt-6 bg-uale-card border border-uale-stone-200 rounded-2xl shadow-sm p-6">
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-uale-sec mb-4">Every subskill</h2>
             <div className="space-y-2">
               {graded.map((r) => (
                 <div key={r.label} className="flex items-center gap-3">
-                  <span className="text-xs text-neutral-600 w-40 shrink-0 truncate">{r.label}</span>
-                  <div className="flex-1 h-1.5 rounded-full bg-neutral-100 overflow-hidden">
-                    <div className={'h-full ' + (r.pct >= 75 ? 'bg-emerald-500' : r.pct >= 50 ? 'bg-amber-500' : 'bg-rose-500')} style={{ width: r.pct + '%' }} />
+                  <span className="text-xs text-uale-sec w-40 shrink-0 truncate">{r.label}</span>
+                  <div className="flex-1 h-1.5 rounded-full bg-uale-stone-100 overflow-hidden">
+                    <div className={'h-full ' + (r.pct >= 75 ? 'bg-uale-sage' : r.pct >= 50 ? 'bg-uale-brass' : 'bg-amber-400')} style={{ width: r.pct + '%' }} />
                   </div>
-                  <span className="text-xs text-neutral-500 w-16 text-right">{r.c}/{r.n}</span>
+                  <span className="text-xs text-uale-sec w-16 text-right">{r.c}/{r.n}</span>
                 </div>
               ))}
             </div>
@@ -205,10 +205,10 @@ export default function MockExam({ state, onCommit, onRemediate, onTargeted, onE
         const isCur = i === idx;
         const ans = answers[i] != null;
         const flag = flagged.has(i);
-        let cls = 'bg-neutral-100 text-neutral-500 ring-neutral-200';
-        if (ans) cls = 'bg-neutral-800 text-white ring-neutral-800';
+        let cls = 'bg-uale-stone-50 text-uale-sec ring-uale-stone-200';
+        if (ans) cls = 'bg-uale-ink text-uale-cream ring-uale-ink';
         if (flag) cls = 'bg-amber-100 text-amber-800 ring-amber-400';
-        if (isCur) cls = 'bg-orange-600 text-white ring-orange-600';
+        if (isCur) cls = 'bg-uale-brass-2 text-white ring-uale-brass-2';
         return (
           <button key={i} onClick={() => go(i)} className={'h-8 rounded text-xs font-medium ring-1 ' + cls}>{i + 1}</button>
         );
@@ -219,22 +219,22 @@ export default function MockExam({ state, onCommit, onRemediate, onTargeted, onE
   if (phase === 'review') {
     const unanswered = answers.map((a, i) => (a == null ? i : -1)).filter((i) => i >= 0);
     return (
-      <div className="min-h-screen bg-neutral-100">
+      <div className="min-h-screen bg-uale-ivory text-uale-text">
         <main className="max-w-2xl mx-auto px-6 py-10">
-          <div className="bg-white rounded-2xl ring-1 ring-neutral-200 p-6">
-            <h1 className="text-xl font-bold text-neutral-900">Review before submitting</h1>
+          <div className="bg-uale-card border border-uale-stone-200 rounded-2xl shadow-sm p-6">
+            <h1 className="font-uale-serif text-xl font-semibold text-uale-ink">Review before submitting</h1>
             <div className="mt-3 flex gap-4 text-sm">
-              <span className="text-neutral-700"><b>{answeredCount}</b> answered</span>
-              <span className="text-rose-600"><b>{unanswered.length}</b> unanswered</span>
+              <span className="text-uale-ink-2"><b>{answeredCount}</b> answered</span>
+              <span className="text-amber-700"><b>{unanswered.length}</b> unanswered</span>
               <span className="text-amber-600"><b>{flagged.size}</b> flagged</span>
             </div>
             {unanswered.length > 0 && (
-              <p className="mt-3 text-sm text-neutral-600">Unanswered questions are scored as incorrect. Tap a number to go back, or submit now.</p>
+              <p className="mt-3 text-sm text-uale-sec">Unanswered questions are scored as incorrect. Tap a number to go back, or submit now.</p>
             )}
             <div className="mt-5"><Palette /></div>
             <div className="mt-6 flex gap-3">
-              <button onClick={() => go(idx)} className="flex-1 bg-neutral-100 hover:bg-neutral-200 text-neutral-800 rounded-lg py-3 text-sm font-semibold">Back to exam</button>
-              <button onClick={submit} className="flex-1 bg-orange-600 hover:bg-orange-500 text-white rounded-lg py-3 text-sm font-semibold flex items-center justify-center gap-2"><CheckCircle2 className="w-4 h-4" /> Submit exam</button>
+              <button onClick={() => go(idx)} className="flex-1 bg-uale-paper border border-uale-stone-200 text-uale-ink-2 rounded-lg py-3 text-sm font-semibold">Back to exam</button>
+              <button onClick={submit} className="flex-1 bg-uale-cta-fill text-uale-cta-text border border-uale-cta-border hover:bg-uale-cta-hover rounded-xl py-3 text-sm font-semibold flex items-center justify-center gap-2"><CheckCircle2 className="w-4 h-4" /> Submit exam</button>
             </div>
           </div>
         </main>
@@ -247,18 +247,18 @@ export default function MockExam({ state, onCommit, onRemediate, onTargeted, onE
   const lab = labelFor(q);
   const low = timeLeft <= 300;
   return (
-    <div className="min-h-screen bg-neutral-100">
-      <header className="bg-white ring-1 ring-neutral-200 sticky top-0 z-10">
+    <div className="min-h-screen bg-uale-ivory text-uale-text">
+      <header className="bg-uale-paper border-b border-uale-stone-200 sticky top-0 z-10">
         <div className="max-w-3xl mx-auto px-6 py-3">
           <div className="flex items-center justify-between text-sm">
-            <span className="font-medium text-neutral-700">Mock Exam</span>
-            <span className={'flex items-center gap-1.5 font-semibold tabular-nums ' + (low ? 'text-rose-600' : 'text-neutral-700')}><Clock className="w-4 h-4" /> {fmtTime(timeLeft)}</span>
-            <button onClick={onExit} className="text-neutral-400 hover:text-neutral-700 flex items-center gap-1 text-xs"><X className="w-4 h-4" /> Exit</button>
+            <span className="font-medium text-uale-ink-2">Mock Exam</span>
+            <span className={'flex items-center gap-1.5 font-semibold tabular-nums ' + (low ? 'text-rose-600' : 'text-uale-ink-2')}><Clock className="w-4 h-4" /> {fmtTime(timeLeft)}</span>
+            <button onClick={onExit} className="text-uale-faint hover:text-uale-ink-2 flex items-center gap-1 text-xs"><X className="w-4 h-4" /> Exit</button>
           </div>
           <div className="mt-2 h-1.5 rounded-full bg-neutral-200 overflow-hidden">
-            <div className="h-full bg-orange-600 transition-all" style={{ width: ((idx + 1) / questions.length) * 100 + '%' }} />
+            <div className="h-full bg-uale-brass transition-all" style={{ width: ((idx + 1) / questions.length) * 100 + '%' }} />
           </div>
-          <div className="mt-1 flex justify-between text-xs text-neutral-400">
+          <div className="mt-1 flex justify-between text-xs text-uale-faint">
             <span>Question {idx + 1} of {questions.length}</span>
             <span>{answeredCount} answered</span>
           </div>
@@ -267,15 +267,15 @@ export default function MockExam({ state, onCommit, onRemediate, onTargeted, onE
 
       <main key={q.id} className="max-w-3xl mx-auto px-6 py-8">
         <div className="flex items-center gap-2 mb-4">
-          <span className="text-xs px-2 py-1 rounded-full bg-neutral-200 text-neutral-700">{lab.domain} · {lab.subskill}</span>
-          <button onClick={toggleFlag} className={'text-xs flex items-center gap-1 px-2 py-1 rounded-full ring-1 ' + (flagged.has(idx) ? 'bg-amber-100 text-amber-700 ring-amber-300' : 'text-neutral-500 ring-neutral-200 hover:bg-neutral-100')}>
+          <span className="text-xs px-2 py-1 rounded-full bg-uale-stone-100 text-uale-ink-2">{lab.domain} · {lab.subskill}</span>
+          <button onClick={toggleFlag} className={'text-xs flex items-center gap-1 px-2 py-1 rounded-full ring-1 ' + (flagged.has(idx) ? 'bg-amber-100 text-amber-700 ring-amber-300' : 'text-uale-sec ring-uale-stone-200 hover:bg-uale-stone-100')}>
             <Flag className="w-3 h-3" /> {flagged.has(idx) ? 'Flagged' : 'Flag'}
           </button>
         </div>
         {q.passage && (
           <pre className="whitespace-pre-wrap text-sm bg-neutral-900 text-neutral-100 rounded-xl p-4 mb-5 font-mono leading-relaxed">{q.passage}</pre>
         )}
-        <h2 className="text-xl font-semibold text-neutral-900 mb-5">{q.prompt}</h2>
+        <h2 className="text-xl font-semibold text-uale-ink mb-5">{q.prompt}</h2>
         {/* During the exam diagrams never reveal the answer. */}
         {q.visual && <MechanicalDiagram visual={q.visual} revealed={false} />}
         <div className="space-y-3">
@@ -283,23 +283,23 @@ export default function MockExam({ state, onCommit, onRemediate, onTargeted, onE
             const picked = answers[idx] === i;
             return (
               <button key={i} onClick={() => choose(i)}
-                className={'w-full text-left px-4 py-3.5 rounded-xl border-2 transition flex items-center gap-2 ' + (picked ? 'border-orange-500 bg-orange-50' : 'border-neutral-200 hover:border-orange-300')}>
-                <span className="text-neutral-400">{String.fromCharCode(65 + i)}</span><span className="text-neutral-800">{opt}</span>
+                className={'w-full text-left px-4 py-3.5 rounded-xl border-2 transition flex items-center gap-2 ' + (picked ? 'border-uale-brass-lite bg-uale-brass-soft' : 'border-uale-stone-200 hover:border-uale-brass-lite')}>
+                <span className="text-uale-faint">{String.fromCharCode(65 + i)}</span><span className="text-uale-ink-2">{opt}</span>
               </button>
             );
           })}
         </div>
 
         <div className="mt-6 flex items-center gap-3">
-          <button onClick={() => go(idx - 1)} disabled={idx === 0} className="flex items-center gap-1 px-4 py-2.5 rounded-lg text-sm font-semibold text-neutral-700 bg-white ring-1 ring-neutral-200 disabled:opacity-40"><ChevronLeft className="w-4 h-4" /> Prev</button>
+          <button onClick={() => go(idx - 1)} disabled={idx === 0} className="flex items-center gap-1 px-4 py-2.5 rounded-lg text-sm font-semibold text-uale-ink-2 bg-uale-paper border border-uale-stone-200 disabled:opacity-40"><ChevronLeft className="w-4 h-4" /> Prev</button>
           {idx < questions.length - 1
-            ? <button onClick={() => go(idx + 1)} className="flex-1 flex items-center justify-center gap-1 px-4 py-2.5 rounded-lg text-sm font-semibold text-white bg-neutral-900 hover:bg-neutral-800">Next <ChevronRight className="w-4 h-4" /></button>
-            : <button onClick={() => setPhase('review')} className="flex-1 px-4 py-2.5 rounded-lg text-sm font-semibold text-white bg-orange-600 hover:bg-orange-500">Review &amp; submit</button>}
-          <button onClick={() => setPhase('review')} className="px-4 py-2.5 rounded-lg text-sm font-semibold text-neutral-700 bg-white ring-1 ring-neutral-200">Review</button>
+            ? <button onClick={() => go(idx + 1)} className="flex-1 flex items-center justify-center gap-1 px-4 py-2.5 rounded-lg text-sm font-semibold text-uale-cta-text bg-uale-cta-fill border border-uale-cta-border hover:bg-uale-cta-hover">Next <ChevronRight className="w-4 h-4" /></button>
+            : <button onClick={() => setPhase('review')} className="flex-1 px-4 py-2.5 rounded-lg text-sm font-semibold text-uale-cta-text bg-uale-cta-fill border border-uale-cta-border hover:bg-uale-cta-hover">Review &amp; submit</button>}
+          <button onClick={() => setPhase('review')} className="px-4 py-2.5 rounded-lg text-sm font-semibold text-uale-ink-2 bg-uale-paper border border-uale-stone-200">Review</button>
         </div>
 
-        <div className="mt-8 bg-white rounded-2xl ring-1 ring-neutral-200 p-4">
-          <p className="text-xs font-semibold uppercase tracking-wide text-neutral-400 mb-3">Question navigator</p>
+        <div className="mt-8 bg-uale-card border border-uale-stone-200 rounded-2xl shadow-sm p-4">
+          <p className="text-xs font-semibold uppercase tracking-wide text-uale-faint mb-3">Question navigator</p>
           <Palette />
         </div>
       </main>
