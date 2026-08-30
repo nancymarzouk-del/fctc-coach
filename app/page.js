@@ -10,12 +10,14 @@ import { questionProvider, SUBSKILLS, makeRng } from '../lib/questionEngine'
 import {
   storage, blankState, recordAnswer, endSession, readinessScore, readinessInfo,
   overallConfidence, domainMastery, subskillMastery, subskillConfidence,
-  weakAreas, buildTargetedSession, recommendations, nextBestAction,
+  weakAreas, buildTargetedSession, recommendations, nextBestAction, analyzeSkills,
   buildRemediationSession, commitSessionStats, categoryStats
 } from '../lib/learningEngine'
 import { generateScenario, generateBoard, generateRecallQuestions } from '../lib/recallScenario'
 import MechanicalDiagram from '../components/MechanicalDiagram'
 import MockExam from '../components/MockExam'
+import RecallBoard from '../components/RecallBoard'
+import { classifyRecallDetail, recallStrategy, recordRecallMiss, focusDetailType, detailTypeToBoardKind } from '../lib/recallCoach'
 
 const DOMAIN_ICONS = { mechanical: Wrench, math: TrendingUp, reading: BookOpen, recall: Eye }
 const DOMAIN_ACCENT = {
@@ -60,6 +62,8 @@ export default function App() {
   useEffect(() => { setUsers(storage.listUsers()) }, [])
 
   const persist = (next) => { setState(next); storage.save(next.userId, next) }
+  // Remember the most recent activity so the dashboard can offer "continue".
+  const noteActivity = (activity) => { if (state) persist({ ...state, lastActivity: activity }) }
 
   const login = (name) => {
     const id = name.trim()
@@ -93,7 +97,7 @@ export default function App() {
     setSessionLog([]); setSessionLabel(label); setPage('session')
   }
 
-  const startTargeted = () => startSession(buildTargetedSession(state, 10), 'Targeted Practice')
+  const startTargeted = () => { noteActivity({ kind: 'targeted', label: 'Targeted Practice' }); startSession(buildTargetedSession(state, 10), 'Targeted Practice') }
 
   // Repeated misses in a mechanical subskill → a guided remediation ladder
   // (worked example → progressively harder transfer). Falls back to targeted
@@ -107,10 +111,22 @@ export default function App() {
     }
   }
 
+  // Resume the learner's most recent activity (device-local; no cross-device sync).
+  const continueActivity = () => {
+    const a = state && state.lastActivity
+    if (!a) return
+    if (a.kind === 'recall') startRecallDrill()
+    else if (a.kind === 'domain' && a.domain) startDomain(a.domain)
+    else if (a.kind === 'mock') setPage('mock')
+    else if (a.kind === 'guided') startNextBestAction()
+    else startTargeted()
+  }
+
   const startDomain = (domain) => {
     // Recall is always trained visually (study a board, then recall) — never
     // as standalone text questions.
     if (domain === 'recall') { startRecallDrill(); return }
+    noteActivity({ kind: 'domain', label: SUBSKILLS[domain].label, domain })
     const subs = Object.keys(SUBSKILLS[domain].subskills)
     const plan = Array.from({ length: 10 }, (_, i) => {
       const sk = subs[i % subs.length]
@@ -154,9 +170,24 @@ export default function App() {
     }
   }
 
+  // Generate + enrich a recall queue: each question is tagged with the detail
+  // type it tests and the matching memory strategy (for the reveal + tracking).
+  const buildRecallQueue = (sc) => {
+    const qs = generateRecallQuestions(sc, Date.now(), Math.min(6, Math.max(4, sc.detailCount - 1)))
+    return qs.map(q => {
+      const detailType = classifyRecallDetail({ subskill: q.subskill, prompt: q.prompt })
+      return { ...q, meta: { ...(q.meta || {}), detailType, recallStrategy: recallStrategy(detailType) } }
+    })
+  }
+
   const startRecallDrill = () => {
     const diff = state ? Math.max(1, Math.min(5, Math.round(domainMastery(state, 'recall') * 4) + 1)) : 2
-    const sc = generateBoard(Date.now(), diff)
+    // Steer the next scene toward a repeatedly-missed detail type (different
+    // board/context, never a near-identical scene).
+    const focus = state ? focusDetailType(state.recallMisses) : null
+    const preferKind = focus ? detailTypeToBoardKind(focus) : null
+    const sc = generateBoard(Date.now(), diff, preferKind)
+    noteActivity({ kind: 'recall', label: 'Visual Recall Drill' })
     setScenario(sc)
     setSceneStep(0)
     setSceneProgress(0)
@@ -177,7 +208,7 @@ export default function App() {
       setSceneTimeLeft(Math.max(0, Math.ceil((scenario.durationMs - elapsed) / 1000)))
       if (elapsed >= scenario.durationMs) {
         clearInterval(sceneTimer.current)
-        const qs = generateRecallQuestions(scenario, Date.now(), Math.min(6, Math.max(4, scenario.detailCount - 1)))
+        const qs = buildRecallQueue(scenario)
         setQueue(qs); setQIndex(0); setSelected(null); setRevealed(false); setSessionLog([])
         setPage('recallQuiz')
       }
@@ -188,7 +219,7 @@ export default function App() {
 
   const skipToQuiz = () => {
     if (sceneTimer.current) clearInterval(sceneTimer.current)
-    const qs = generateRecallQuestions(scenario, Date.now(), Math.min(6, Math.max(4, scenario.detailCount - 1)))
+    const qs = buildRecallQueue(scenario)
     setQueue(qs); setQIndex(0); setSelected(null); setRevealed(false); setSessionLog([])
     setPage('recallQuiz')
   }
@@ -200,6 +231,8 @@ export default function App() {
     const correct = idx === q.correct
     const next = { ...state }
     recordAnswer(next, 'recall', q.subskill, correct, q.difficulty)
+    // Track WHAT KIND of detail was missed, to steer future scenes.
+    if (!correct && q.meta?.detailType) next.recallMisses = recordRecallMiss(next.recallMisses, q.meta.detailType)
     persist(next)
     setSessionLog(l => [...l, { correct, domain: 'recall', subskill: q.subskill, q }])
   }
@@ -286,6 +319,10 @@ export default function App() {
     const recs = recommendations(state)
     const weak = weakAreas(state, 4)
     const fresh = state.totalAnswered === 0
+    // Recent improvement: only evaluated skills that are genuinely trending up
+    // (the trend needs enough evidence — no decorative percentages).
+    const improving = analyzeSkills(state).filter(c => c.trend?.trend === 'improving').slice(0, 3)
+    const cont = state.lastActivity
 
     return (
       <div className="min-h-screen bg-neutral-100">
@@ -305,6 +342,21 @@ export default function App() {
         </header>
 
         <main className="max-w-5xl mx-auto px-6 py-8">
+          {(cont || improving.length > 0) && (
+            <section className="mb-4 flex flex-wrap items-center gap-3">
+              {cont && (
+                <button onClick={continueActivity}
+                  className="flex items-center gap-2 bg-white ring-1 ring-neutral-200 hover:ring-orange-300 rounded-xl px-4 py-2.5 text-sm font-semibold text-neutral-800">
+                  <PlayCircle className="w-4 h-4 text-orange-500" /> Continue {cont.label}
+                </button>
+              )}
+              {improving.map((c) => (
+                <span key={c.subskill} className="flex items-center gap-1.5 text-xs font-medium text-emerald-700 bg-emerald-50 ring-1 ring-emerald-200 rounded-full px-3 py-1.5">
+                  <TrendingUp className="w-3.5 h-3.5" /> {c.subskillLabel} improving
+                </span>
+              ))}
+            </section>
+          )}
           <section className="grid md:grid-cols-3 gap-4">
             <div className="md:col-span-2 bg-white rounded-2xl p-6 ring-1 ring-neutral-200">
               <div className="flex items-center gap-2 text-neutral-500 text-sm"><Gauge className="w-4 h-4" /> Readiness score</div>
@@ -729,8 +781,11 @@ export default function App() {
           @keyframes recIn { from { opacity: 0; transform: translateY(6px) scale(0.98); } to { opacity: 1; transform: none; } }
         `}</style>
         <header className="max-w-3xl mx-auto px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-2 text-sm text-rose-400">
-            <span className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-pulse" /> STUDY THE BOARD — memorize the details
+          <div>
+            <div className="flex items-center gap-2 text-sm text-rose-400">
+              <span className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-pulse" /> STUDY THE BOARD — memorize the details
+            </div>
+            <p className="text-[11px] text-neutral-500 mt-0.5 ml-4">Level {b.difficulty} of 5 · scene disappears in {sceneTimeLeft}s</p>
           </div>
           <div className="relative w-12 h-12">
             <svg viewBox="0 0 36 36" className="w-12 h-12 -rotate-90">
@@ -812,6 +867,15 @@ export default function App() {
                 <Lightbulb className="w-4 h-4 text-rose-500" /> Recall check
               </div>
               <p className="text-sm text-neutral-700 leading-relaxed">{q.explanation}</p>
+              {q.meta?.recallStrategy && (
+                <p className="mt-2 text-sm text-sky-800 bg-sky-50 rounded-lg px-3 py-2 leading-relaxed">{q.meta.recallStrategy}</p>
+              )}
+              {scenario && (
+                <div className="mt-3">
+                  <p className="text-xs text-neutral-500 mb-2">Here's the scene again — find the detail you were asked about:</p>
+                  <RecallBoard board={scenario} compact animate={false} />
+                </div>
+              )}
               <button onClick={nextRecall}
                 className="mt-4 w-full bg-neutral-900 hover:bg-neutral-800 text-white rounded-lg py-3 font-semibold flex items-center justify-center gap-2">
                 {qIndex + 1 < queue.length ? 'Next question' : 'See results'} <ChevronRight className="w-4 h-4" />
