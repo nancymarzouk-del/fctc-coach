@@ -6,7 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "test": "node --test tests/metrics.test.mjs tests/mechanical.test.mjs tests/math.test.mjs tests/reading.test.mjs tests/recall.test.mjs tests/blueprint.test.mjs tests/cfa-tvm.test.mjs tests/study-plan.test.mjs tests/cfa.test.mjs",
+    "test": "node --test tests/metrics.test.mjs tests/mechanical.test.mjs tests/math.test.mjs tests/reading.test.mjs tests/recall.test.mjs tests/blueprint.test.mjs tests/cfa-tvm.test.mjs tests/study-plan.test.mjs tests/cfa.test.mjs tests/cfa-learner.test.mjs",
     "metrics:report": "node tests/metrics-report.mjs"
   },
   "dependencies": {

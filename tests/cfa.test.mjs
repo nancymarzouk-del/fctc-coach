@@ -114,17 +114,19 @@ test('generateCfaItem produces provenance-stamped items for quant and ethics', (
   assert.equal(tvm.meta.provenance.origin, 'uale-original');
   const eth = generateCfaItem({ topic: 'ethics', subskill: 'mnpi', rng });
   assert.equal(eth.meta.provenance.topicLabel, 'Ethical and Professional Standards');
-  assert.equal(generateCfaItem({ topic: 'derivatives', subskill: 'concepts', rng }), null); // no generator yet (honest)
+  // Every official topic is now generatable (foundational coverage).
+  const der = generateCfaItem({ topic: 'derivatives', subskill: 'concepts', rng });
+  assert.ok(der && der.options.length === 3, 'derivatives now has a generator');
   assert.equal(hasGenerator('quant', 'tvm'), true);
-  assert.equal(hasGenerator('derivatives', 'concepts'), false);
+  assert.equal(hasGenerator('derivatives', 'concepts'), true);
 });
 
-test('diagnostic samples across topics and honestly reports pending coverage', () => {
-  const { plan, coveredTopics, pendingTopics } = buildCfaDiagnostic(lcg(5), { perCell: 2 });
-  assert.ok(plan.length >= 8);
-  assert.ok(coveredTopics.includes('ethics') && coveredTopics.includes('quant'));
-  assert.ok(pendingTopics.includes('economics') && pendingTopics.length > 0, 'pending topics reported, not faked');
-  assert.equal(coveredTopics.length + pendingTopics.length, TOPIC_ORDER.length);
+test('diagnostic samples across ALL ten official topics', () => {
+  const { plan, coveredTopics, pendingTopics } = buildCfaDiagnostic(lcg(5), { perCell: 1 });
+  assert.ok(plan.length >= 10);
+  for (const t of TOPIC_ORDER) assert.ok(coveredTopics.includes(t), `diagnostic must cover ${t}`);
+  assert.equal(pendingTopics.length, 0, 'all ten topics are now generatable');
+  assert.equal(coveredTopics.length, TOPIC_ORDER.length);
 });
 
 test('readiness is withheld until >=3 topics evaluated, then evidence + weight based', () => {
