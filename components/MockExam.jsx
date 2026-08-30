@@ -1,13 +1,18 @@
 // ============================================================================
 // MockExam.jsx — a full FCTC-style practice exam experience.
 // ----------------------------------------------------------------------------
-// 100 original questions across Mechanical, Math, and Technical Reading (Visual/
-// Verbal Recall is assessed on its own timed drill, which is more authentic than
-// a read-off passage). This is a BALANCED practice distribution, NOT a claim of
-// official FCTC section weighting. Includes a 2.5-hour timer, a question palette
-// for navigation + flag-for-review, unanswered-question handling, a review step,
-// and a full score / domain / subskill breakdown that feeds the evidence-aware
-// metrics engine and routes the learner straight into remediation.
+// 100 original questions across all FOUR official domains at the OFFICIAL FCTC
+// section weighting (from lib/fctcBlueprint.mjs): Verbal & Visual Information 20 ·
+// Mechanical Reasoning 25 · Mathematical Problems 20 · Technical Written Materials
+// 35. This is FCTC-ALIGNED practice (original items, not official questions).
+// Includes the official 2-hour timer, a question palette for navigation +
+// flag-for-review, unanswered-question handling, a review step, and a full score /
+// domain / subskill breakdown that feeds the evidence-aware metrics engine and
+// routes the learner straight into remediation.
+//
+// NOTE (Sprint 1): recall items appear here with their scene visible; the fully
+// authentic study-then-hide recall block within the mock is the next iteration —
+// the standalone Visual Recall Drill remains the memory-from-hidden-source path.
 //
 // Self-contained: it owns exam → results. On submit it records ANSWERED questions
 // into a cloned learner state (unanswered count as incorrect for scoring but are
@@ -18,10 +23,11 @@ import { Clock, Flag, ChevronLeft, ChevronRight, CheckCircle2, Target, Lightbulb
 import { questionProvider, SUBSKILLS, makeRng } from '../lib/questionEngine';
 import { recordAnswer, commitSessionStats, endSession, nextBestAction } from '../lib/learningEngine';
 import { buildMockPlan } from '../lib/learningEngine';
+import { OFFICIAL_EXAM_SECONDS, OFFICIAL_TOTAL } from '../lib/fctcBlueprint.mjs';
 import MechanicalDiagram from './MechanicalDiagram';
 
-const EXAM_SECONDS = 150 * 60; // 2.5 hours
-const TOTAL = 100;
+const EXAM_SECONDS = OFFICIAL_EXAM_SECONDS; // 2 hours (official FCTC)
+const TOTAL = OFFICIAL_TOTAL;               // 100 (official FCTC)
 
 function fmtTime(s) {
   const sec = Math.max(0, s);
@@ -117,7 +123,7 @@ export default function MockExam({ state, onCommit, onRemediate, onTargeted, onE
   // ---- RESULTS ---------------------------------------------------------------
   if (phase === 'results' && outcome) {
     const { results, nba } = outcome;
-    const domOrder = ['mechanical', 'math', 'reading'];
+    const domOrder = ['recall', 'mechanical', 'math', 'reading'];
     const graded = results.subRows.filter((r) => r.n > 0).sort((a, b) => a.pct - b.pct);
     const weakest = graded.slice(0, 3);
     const strongest = [...graded].reverse().slice(0, 3);
@@ -128,7 +134,7 @@ export default function MockExam({ state, onCommit, onRemediate, onTargeted, onE
             <p className="text-sm text-uale-sec">Mock exam complete</p>
             <p className="font-uale-serif text-6xl font-semibold text-uale-ink mt-2">{results.pct}%</p>
             <p className="text-uale-sec mt-1">{results.correct} of {results.total} correct · {results.answered} answered · {fmtTime(EXAM_SECONDS - timeLeft)} used</p>
-            <p className="mt-2 text-xs text-uale-faint">Balanced practice distribution — not official FCTC section weighting.</p>
+            <p className="mt-2 text-xs text-uale-faint">FCTC-aligned practice at the official section weighting (20 · 25 · 20 · 35).</p>
           </div>
 
           {/* Post-mock next action */}
