@@ -6,13 +6,18 @@
 // tracking. Device-local progress via cfaStore. No CFA Institute content reproduced.
 // ============================================================================
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { TrendingUp, BookOpen, Target, Calendar, ClipboardCheck, ArrowRight, CheckCircle2, XCircle, Lightbulb } from 'lucide-react';
+import { TrendingUp, BookOpen, Target, Calendar, ClipboardCheck, ArrowRight, ArrowLeft, CheckCircle2, XCircle, Lightbulb } from 'lucide-react';
 import { getCertification } from '../../lib/certRegistry.mjs';
 import { analyzeSkills, EVIDENCE } from '../../lib/metrics.mjs';
 import { metricsRegistryFor } from '../../lib/certRegistry.mjs';
-import { generateCfaItem, buildCfaDiagnostic, cfaReadiness, generatableCells } from '../../lib/certifications/cfa/cfaEngine.mjs';
+import { generateCfaItem, buildCfaDiagnostic, cfaReadiness, generatableCells, cfaTopicAnalysis } from '../../lib/certifications/cfa/cfaEngine.mjs';
 import { TOPIC_ORDER, TOPICS, EXAM, APPROVED_CALCULATORS, PRACTICE_LABEL } from '../../lib/certifications/cfa/cfaBlueprint.mjs';
 import { recurringMisconceptions, misconceptionPhrase } from '../../lib/certifications/cfa/misconceptions.mjs';
+
+// UALE is the authority for which modules a learner may access; "Back to UALE"
+// returns the learner to the capability-aware UALE home rather than trapping them in
+// this module. It is navigation only — it never grants access (UALE re-gates).
+const UALE_HOME = 'https://florence-sand-phi.vercel.app/';
 import { createStudyPlan, updateStudyPlan, recalcPlan } from '../../lib/studyPlan.mjs';
 import { PSM_OPTIONS, PSM_STATUS, selectPsm, setPsmStatus, PSM_REQUIREMENT_NOTE } from '../../lib/certifications/cfa/psm.mjs';
 import { loadCfaState, saveCfaState, recordCfaAnswer, emptyCfaState } from '../../lib/certifications/cfa/cfaStore.mjs';
@@ -73,7 +78,10 @@ export default function CfaExperience() {
   const reveal = () => {
     if (session.picked == null || session.revealed) return;
     const correct = session.picked === q.correct;
-    const misKey = q.meta?.provenance?.topic === 'quant' ? (q.meta?.diagnostics?.[session.picked]?.misconception || null) : null;
+    // Capture a stable misconception key when the picked distractor carries one —
+    // quant (TVM diagnostics) or a topic item (meta.misconceptions) — for the
+    // cross-question memory. Correct answers carry none.
+    const misKey = (q.meta?.diagnostics?.[session.picked]?.misconception) || (q.meta?.misconceptions?.[session.picked]) || null;
     persist(recordCfaAnswer(state, { domain: q.topic, subskill: q.subskill, correct, difficulty: 2, misconceptionKey: misKey }));
     setSession((s) => ({ ...s, revealed: true }));
   };
@@ -92,13 +100,25 @@ export default function CfaExperience() {
   }), [plan, masteryByTopic]);
 
   const recurring = recurringMisconceptions(state.misconceptions);
+  // Learner-facing interpretation of the evidence (strengths / focus / developing /
+  // need-more-evidence + an evidence-derived next step). Recomputes as evidence grows.
+  const topicAnalysis = useMemo(() => cfaTopicAnalysis(state.domains, state.misconceptions), [state]);
+  const actOnRecommendation = (rec) => {
+    if (!rec) return;
+    if (rec.kind === 'practice-topic' && rec.topic) startTopic(rec.topic);
+    else if (rec.kind === 'mixed') startMixed(10, 'Mixed practice');
+    else startDiagnostic();
+  };
 
   // ============================ RENDER =========================================
   return (
     <div className="min-h-screen bg-uale-ivory text-uale-text">
       <header className="bg-uale-hero-3 text-uale-cream">
         <div className="max-w-4xl mx-auto px-6 py-6">
-          <p className="text-xs uppercase tracking-[0.17em] text-uale-champagne">UALE · Professional Certification</p>
+          <a href={UALE_HOME} className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-uale-cream-dim hover:text-uale-cream">
+            <ArrowLeft className="w-4 h-4" /> Back to UALE
+          </a>
+          <p className="mt-4 text-xs uppercase tracking-[0.17em] text-uale-champagne">UALE · Professional Certification</p>
           <h1 className="font-uale-serif text-3xl font-semibold mt-1">CFA Level I</h1>
           <p className="text-sm text-uale-cream-dim mt-1">{PRACTICE_LABEL} — original items aligned to the official topic blueprint. Not affiliated with or endorsed by CFA Institute.</p>
         </div>
@@ -135,6 +155,63 @@ export default function CfaExperience() {
             <button onClick={() => setView('mock')} className={btnGhost}><Target className="w-4 h-4" /> Mock</button>
             <button onClick={() => setView('psm')} className={btnGhost}><ClipboardCheck className="w-4 h-4" /> Practical Skills Module</button>
           </div>
+        </section>
+
+        {/* Your strengths & focus areas — the learner-facing interpretation. */}
+        <section className="mt-6 bg-uale-card border border-uale-stone-200 rounded-2xl p-6 shadow-sm">
+          <div className="flex items-center gap-2 text-uale-sec text-sm"><Target className="w-4 h-4" /> Your strengths &amp; focus areas</div>
+
+          {/* Alyce's interpretation + one clear next step (evidence-derived). */}
+          <div className="mt-3 rounded-xl bg-uale-hero-3/5 border border-uale-stone-200 bg-uale-paper p-4">
+            <p className="text-[11px] font-bold uppercase tracking-[0.15em] text-uale-brass-2">Alyce recommends</p>
+            <p className="mt-1 text-[14px] text-uale-ink-2 leading-relaxed">{topicAnalysis.recommendation.text}</p>
+            <button onClick={() => actOnRecommendation(topicAnalysis.recommendation)} className={btn + ' mt-3'}>
+              {topicAnalysis.recommendation.kind === 'diagnostic' ? 'Start diagnostic' : topicAnalysis.recommendation.kind === 'mixed' ? 'Start mixed practice' : `Practice ${TOPICS[topicAnalysis.recommendation.topic].label}`}
+              <ArrowRight className="w-4 h-4" />
+            </button>
+          </div>
+
+          {!topicAnalysis.hasEnoughEvidence ? (
+            <p className="mt-4 text-[13.5px] text-uale-sec">We need a little more evidence to identify your strongest and weakest areas. Answer a few questions and this updates automatically — it reflects your current performance, not a permanent label.</p>
+          ) : (
+            <div className="mt-4 grid sm:grid-cols-2 gap-4">
+              {/* Strong */}
+              <AreaColumn title="Strong areas" tone="sage" empty="None demonstrated yet.">
+                {topicAnalysis.strong.map((x) => (
+                  <AreaRow key={x.topic} label={TOPICS[x.topic].label} meta={`Mastery ${Math.round(x.mastery * 100)}%`} tone="sage"
+                    action={<button onClick={() => startTopic(x.topic)} className={chipBtn}>Keep sharp</button>} />
+                ))}
+              </AreaColumn>
+              {/* Focus */}
+              <AreaColumn title="Focus areas" tone="amber" empty="Nothing flagged — nice.">
+                {topicAnalysis.focus.map((x) => (
+                  <AreaRow key={x.topic} label={TOPICS[x.topic].label} meta={`Mastery ${Math.round(x.mastery * 100)}%`} tone="amber"
+                    pattern={x.pattern ? `Pattern Alyce noticed: you appear to be ${x.pattern.phrase}.` : null}
+                    action={<button onClick={() => startTopic(x.topic)} className={chipBtnPrimary}>Practice this topic</button>} />
+                ))}
+              </AreaColumn>
+              {/* Developing */}
+              {topicAnalysis.developing.length > 0 && (
+                <AreaColumn title="Developing" tone="stone" empty="">
+                  {topicAnalysis.developing.map((x) => (
+                    <AreaRow key={x.topic} label={TOPICS[x.topic].label} meta={`Mastery ${Math.round(x.mastery * 100)}%`} tone="stone"
+                      action={<button onClick={() => startTopic(x.topic)} className={chipBtn}>Strengthen</button>} />
+                  ))}
+                </AreaColumn>
+              )}
+              {/* Need more evidence */}
+              {topicAnalysis.needEvidence.length > 0 && (
+                <AreaColumn title="Need more evidence" tone="stone" empty="">
+                  <div className="flex flex-wrap gap-2">
+                    {topicAnalysis.needEvidence.map((t) => (
+                      <button key={t} onClick={() => startTopic(t)} className={chipBtn}>{TOPICS[t].label}</button>
+                    ))}
+                  </div>
+                  <p className="mt-2 text-[12px] text-uale-faint">Practice any of these so Alyce can assess them.</p>
+                </AreaColumn>
+              )}
+            </div>
+          )}
         </section>
 
         {/* Ten-topic grid */}
@@ -309,3 +386,39 @@ export default function CfaExperience() {
 function shuffle(a) { const r = [...a]; for (let i = r.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [r[i], r[j]] = [r[j], r[i]]; } return r; }
 const btn = 'inline-flex items-center gap-2 bg-uale-cta-fill text-uale-cta-text border border-uale-cta-border hover:bg-uale-cta-hover rounded-xl px-4 py-2.5 text-sm font-semibold';
 const btnGhost = 'inline-flex items-center gap-2 bg-uale-paper text-uale-ink-2 border border-uale-stone-200 hover:border-uale-stone-300 rounded-xl px-4 py-2.5 text-sm font-semibold';
+const chipBtn = 'inline-flex items-center gap-1 text-[12px] font-semibold px-2.5 py-1 rounded-full border border-uale-stone-200 bg-uale-paper text-uale-ink-2 hover:border-uale-stone-300';
+const chipBtnPrimary = 'inline-flex items-center gap-1 text-[12px] font-semibold px-2.5 py-1 rounded-full border border-uale-cta-border bg-uale-cta-fill text-uale-cta-text hover:bg-uale-cta-hover';
+
+const TONE = {
+  sage: { dot: 'bg-uale-sage', head: 'text-uale-sage' },
+  amber: { dot: 'bg-amber-400', head: 'text-amber-700' },
+  stone: { dot: 'bg-uale-stone-300', head: 'text-uale-sec' },
+};
+
+function AreaColumn({ title, tone, empty, children }) {
+  const t = TONE[tone] || TONE.stone;
+  const hasKids = React.Children.count(children) > 0;
+  return (
+    <div className="rounded-xl border border-uale-stone-200 p-4">
+      <div className={'flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.14em] ' + t.head}>
+        <span className={'inline-block w-2 h-2 rounded-full ' + t.dot} /> {title}
+      </div>
+      <div className="mt-3 space-y-3">
+        {hasKids ? children : (empty ? <p className="text-[13px] text-uale-faint">{empty}</p> : null)}
+      </div>
+    </div>
+  );
+}
+
+function AreaRow({ label, meta, pattern, action }) {
+  return (
+    <div>
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-[13.5px] font-medium text-uale-ink">{label}</span>
+        <span className="text-[12px] text-uale-sec tabular-nums">{meta}</span>
+      </div>
+      {pattern && <p className="mt-1 text-[12.5px] text-amber-800">{pattern}</p>}
+      {action && <div className="mt-1.5">{action}</div>}
+    </div>
+  );
+}
