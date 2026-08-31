@@ -75,17 +75,22 @@ test('the seven Standards with subparts are present', () => {
 
 test('ethics items are 3-choice, map to a real Standard, and vary across seeds', () => {
   const seenStandards = new Set();
+  let sawCompliant = false;
   for (let s = 0; s < 60; s++) {
     const q = generateEthicsItem(lcg(s + 1));
     assert.equal(q.options.length, 3, 'CFA uses three answer choices');
     assert.ok(q.correct >= 0 && q.correct < 3);
     assert.ok(q.explanation && q.explanation.length > 10);
-    assert.ok(q.meta.standard && STANDARD_LABELS[q.meta.standard], 'maps to a real Standard');
-    // the correct option is a valid Standard label
-    assert.ok(Object.values(STANDARD_LABELS).includes(q.options[q.correct]));
-    seenStandards.add(q.meta.standard);
+    if (q.concept === 'ethics-compliant') {
+      sawCompliant = true; // the REVERSE family ("which action is compliant?") — no single Standard
+    } else {
+      assert.ok(q.meta.standard && STANDARD_LABELS[q.meta.standard], 'violation items map to a real Standard');
+      assert.ok(Object.values(STANDARD_LABELS).includes(q.options[q.correct]));
+      seenStandards.add(q.meta.standard);
+    }
   }
   assert.ok(seenStandards.size >= 4, 'scenarios must cover several distinct Standards (transfer)');
+  assert.ok(sawCompliant, 'ethics must also offer the reverse "which is compliant?" family');
   assert.ok(ETHICS_SCENARIO_COUNT >= 6);
 });
 

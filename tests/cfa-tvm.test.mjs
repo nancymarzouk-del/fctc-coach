@@ -29,6 +29,9 @@ test('every generated item has a PROGRAMMATICALLY verified correct answer', () =
       const q = TVM_GENERATORS[name](rng);
       assert.ok(q.options.length === 3, `${name}: must have 3 options (CFA A/B/C)`);
       assert.ok(q.correct >= 0 && q.correct < 3, `${name}: valid correct index`);
+      // The conceptual (non-calc) generator has no numeric answer to verify — it is
+      // well-formed but intentionally has no verify(). Skip the numeric check for it.
+      if (typeof q.verify !== 'function') continue;
       // The displayed correct option must equal the independently recomputed value.
       const shown = q.options[q.correct].replace(/[$,%\s]/g, '');
       const verified = q.verify();

@@ -38,7 +38,8 @@ test('a single wrong answer never produces a focus/weak label or a misconception
 });
 
 test('sufficient strong evidence => strong area; sufficient weak evidence => focus area', () => {
-  const a = cfaTopicAnalysis({ quant: { tvm: sub(12, 0) }, fixedIncome: { concepts: sub(1, 6) } }, emptyMisconceptionMemory());
+  const transfer = { quant: { calculation: { correct: 6, total: 6 }, 'conceptual-interpretation': { correct: 3, total: 3 } } };
+  const a = cfaTopicAnalysis({ quant: { tvm: sub(12, 0) }, fixedIncome: { concepts: sub(1, 6) } }, emptyMisconceptionMemory(), transfer);
   assert.ok(a.strong.some((x) => x.topic === 'quant'));
   assert.ok(a.focus.some((x) => x.topic === 'fixedIncome'));
   assert.equal(a.recommendation.kind, 'practice-topic');
@@ -48,7 +49,8 @@ test('sufficient strong evidence => strong area; sufficient weak evidence => foc
 test('analysis evolves as evidence changes (need-evidence -> focus -> strong)', () => {
   assert.ok(cfaTopicAnalysis({}, {}).needEvidence.includes('equity'));
   assert.ok(cfaTopicAnalysis({ equity: { concepts: sub(1, 6) } }, {}).focus.some((x) => x.topic === 'equity'));
-  assert.ok(cfaTopicAnalysis({ equity: { concepts: sub(12, 0) } }, {}).strong.some((x) => x.topic === 'equity'));
+  const tr = { equity: { calculation: { correct: 6, total: 6 }, 'conceptual-interpretation': { correct: 3, total: 3 } } };
+  assert.ok(cfaTopicAnalysis({ equity: { concepts: sub(12, 0) } }, {}, tr).strong.some((x) => x.topic === 'equity'));
 });
 
 test('all ten topics can participate in the analysis', () => {

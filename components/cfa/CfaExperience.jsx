@@ -10,7 +10,8 @@ import { TrendingUp, BookOpen, Target, Calendar, ClipboardCheck, ArrowRight, Arr
 import { getCertification } from '../../lib/certRegistry.mjs';
 import { analyzeSkills, EVIDENCE } from '../../lib/metrics.mjs';
 import { metricsRegistryFor } from '../../lib/certRegistry.mjs';
-import { generateCfaItem, buildCfaDiagnostic, cfaReadiness, generatableCells, cfaTopicAnalysis } from '../../lib/certifications/cfa/cfaEngine.mjs';
+import { generateCfaItem, generateVariedItem, buildCfaDiagnostic, cfaReadiness, generatableCells, cfaTopicAnalysis } from '../../lib/certifications/cfa/cfaEngine.mjs';
+import { familyLabel } from '../../lib/certifications/cfa/families.mjs';
 import { TOPIC_ORDER, TOPICS, EXAM, APPROVED_CALCULATORS, PRACTICE_LABEL } from '../../lib/certifications/cfa/cfaBlueprint.mjs';
 import { recurringMisconceptions, misconceptionPhrase } from '../../lib/certifications/cfa/misconceptions.mjs';
 
@@ -55,10 +56,13 @@ export default function CfaExperience() {
   const buildQueue = (cells, n, label) => {
     const rng = rngFrom(Math.floor((typeof performance !== 'undefined' ? performance.now() : 1) * 1000) % 2147483647 || 7);
     const q = [];
+    // Anti-repetition: avoid concepts seen recently (across sessions) AND within this
+    // queue, so a learner doesn't get the same structure back-to-back.
+    const avoid = [...(state.recentConcepts || [])];
     for (let i = 0; i < n; i++) {
       const c = cells[i % cells.length];
-      const item = generateCfaItem({ topic: c.topic, subskill: c.subskill, rng });
-      if (item) q.push(item);
+      const item = generateVariedItem({ topic: c.topic, subskill: c.subskill, rng, avoidConcepts: avoid });
+      if (item) { q.push(item); avoid.unshift(item.concept); if (avoid.length > 8) avoid.pop(); }
     }
     setSession({ queue: q, idx: 0, picked: null, revealed: false, label });
     setView('practice');
@@ -82,12 +86,30 @@ export default function CfaExperience() {
     // quant (TVM diagnostics) or a topic item (meta.misconceptions) — for the
     // cross-question memory. Correct answers carry none.
     const misKey = (q.meta?.diagnostics?.[session.picked]?.misconception) || (q.meta?.misconceptions?.[session.picked]) || null;
-    persist(recordCfaAnswer(state, { domain: q.topic, subskill: q.subskill, correct, difficulty: 2, misconceptionKey: misKey }));
-    setSession((s) => ({ ...s, revealed: true }));
+    // Live difficulty (the streak-driven ladder) — no longer hard-coded.
+    const cur = state.domains?.[q.topic]?.[q.subskill];
+    const askedD = (cur && cur.difficulty) || 2;
+    const before = state.domains?.[q.topic]?.[q.subskill]?.difficulty || 2;
+    const nextState = recordCfaAnswer(state, { domain: q.topic, subskill: q.subskill, correct, difficulty: askedD, misconceptionKey: misKey, family: q.family, concept: q.concept });
+    persist(nextState);
+    const after = nextState.domains?.[q.topic]?.[q.subskill]?.difficulty || 2;
+    // Adaptive branch: on a miss, PRACTICE DIFFERENTLY — inject a fresh item in the
+    // same topic but a different structure/family (avoiding this concept) right after,
+    // so remediation isn't a near-identical repeat.
+    let reteach = null;
+    if (!correct) {
+      const rng = rngFrom((Math.floor((typeof performance !== 'undefined' ? performance.now() : 2) * 1000) % 2147483647) || 13);
+      reteach = generateVariedItem({ topic: q.topic, subskill: q.subskill, rng, avoidConcepts: [q.concept] });
+    }
+    setSession((s) => {
+      const queue = s.queue.slice();
+      if (reteach) queue.splice(s.idx + 1, 0, { ...reteach, _reteach: true, _fromFamily: q.family });
+      return { ...s, queue, revealed: true, steppedUp: correct && after > before };
+    });
   };
   const next = () => {
     if (session.idx + 1 >= session.queue.length) { setSession(null); setView('home'); return; }
-    setSession((s) => ({ ...s, idx: s.idx + 1, picked: null, revealed: false }));
+    setSession((s) => ({ ...s, idx: s.idx + 1, picked: null, revealed: false, steppedUp: false }));
   };
 
   // ---- study plan ---------------------------------------------------------------
@@ -102,7 +124,7 @@ export default function CfaExperience() {
   const recurring = recurringMisconceptions(state.misconceptions);
   // Learner-facing interpretation of the evidence (strengths / focus / developing /
   // need-more-evidence + an evidence-derived next step). Recomputes as evidence grows.
-  const topicAnalysis = useMemo(() => cfaTopicAnalysis(state.domains, state.misconceptions), [state]);
+  const topicAnalysis = useMemo(() => cfaTopicAnalysis(state.domains, state.misconceptions, state.transfer), [state]);
   const actOnRecommendation = (rec) => {
     if (!rec) return;
     if (rec.kind === 'practice-topic' && rec.topic) startTopic(rec.topic);
@@ -247,12 +269,20 @@ export default function CfaExperience() {
     const isCorrect = revealed && picked === q.correct;
     const diagNote = revealed && !isCorrect
       ? (q.meta?.diagnostics?.[picked]?.note || q.meta?.distractorRationale?.[picked] || null) : null;
+    const pickedKey = revealed && !isCorrect ? (q.meta?.diagnostics?.[picked]?.misconception || q.meta?.misconceptions?.[picked] || null) : null;
+    const recurringHit = pickedKey && recurring.some((r) => r.key === pickedKey); // pattern across questions
+    const reteachNext = revealed && session.queue[session.idx + 1] && session.queue[session.idx + 1]._reteach;
     return (
       <div>
         <div className="flex items-center justify-between text-sm text-uale-sec">
           <span>{session.label} · {q.meta?.provenance?.topicLabel}</span>
           <span>{session.idx + 1} / {session.queue.length}</span>
         </div>
+        {q._reteach && (
+          <p className="mt-3 inline-flex items-center gap-1.5 text-[12.5px] font-semibold text-uale-brass-2 bg-uale-brass-soft rounded-full px-3 py-1">
+            <Lightbulb className="w-3.5 h-3.5" /> Alyce: let's try this a different way
+          </p>
+        )}
         <h2 className="mt-4 text-lg font-semibold text-uale-ink whitespace-pre-wrap">{q.prompt}</h2>
         <div className="mt-5 space-y-3">
           {q.options.map((opt, i) => {
@@ -274,13 +304,29 @@ export default function CfaExperience() {
 
         {revealed && (
           <div className="mt-5 rounded-2xl border border-uale-stone-200 bg-uale-card p-5">
-            <p className={'text-sm font-semibold ' + (isCorrect ? 'text-uale-sage' : 'text-rose-600')}>{isCorrect ? 'Correct' : 'Not quite'}</p>
+            {/* Alyce is visibly the teacher here — diagnose, teach, and set up what's next. */}
+            <div className="flex items-center gap-2">
+              <span className="grid place-items-center w-6 h-6 rounded-full bg-uale-hero-3 text-uale-cream text-[11px] font-bold">A</span>
+              <span className="text-[11px] font-bold uppercase tracking-[0.14em] text-uale-brass-2">Alyce</span>
+              <span className={'ml-1 text-sm font-semibold ' + (isCorrect ? 'text-uale-sage' : 'text-rose-600')}>{isCorrect ? 'Correct' : 'Not quite'}</span>
+            </div>
+            {recurringHit && (
+              <p className="mt-2 text-[13px] text-amber-900 bg-amber-100 border border-amber-300 rounded-lg p-3">
+                I've seen this pattern from you a few times now — let's make it a focus and work through it together.
+              </p>
+            )}
             {diagNote && (
               <p className="mt-2 text-[13.5px] text-amber-800 bg-amber-50 border border-amber-200 rounded-lg p-3 flex gap-2">
                 <Lightbulb className="w-4 h-4 flex-none mt-0.5" /> <span>{isCorrect ? '' : 'This may indicate: '}{diagNote}</span>
               </p>
             )}
             <p className="mt-3 text-[14px] text-uale-ink-2 leading-relaxed">{q.explanation}</p>
+            {isCorrect && session.steppedUp && (
+              <p className="mt-3 text-[13px] text-uale-sage">Nice — you're consistent here, so I'll step up the challenge.</p>
+            )}
+            {reteachNext && (
+              <p className="mt-3 text-[13px] text-uale-ink-2">Next, I'll give you {familyLabel(session.queue[session.idx + 1].family)} on the same idea — to make sure it really clicks, not just the pattern.</p>
+            )}
           </div>
         )}
 
