@@ -18,6 +18,7 @@ import MechanicalDiagram from '../components/MechanicalDiagram'
 import MockExam from '../components/MockExam'
 import RecallBoard from '../components/RecallBoard'
 import { classifyRecallDetail, recallStrategy, recordRecallMiss, focusDetailType, detailTypeToBoardKind } from '../lib/recallCoach'
+import { parseUaleHandoff } from '../lib/ualeHandoff.mjs'
 
 const DOMAIN_ICONS = { mechanical: Wrench, math: TrendingUp, reading: BookOpen, recall: Eye }
 // One calm, UALE-consistent chrome treatment for every domain — identity comes
@@ -70,25 +71,54 @@ export default function App() {
   const [sceneProgress, setSceneProgress] = useState(0) // 0..1 continuous, drives entrances
   const sceneTimer = useRef(null)
 
-  useEffect(() => { setUsers(storage.listUsers()) }, [])
+  // On boot: if UALE launched us with a safe handoff, auto-enter that learner's own
+  // profile and skip the name screen (and strip the handoff from the URL so the key
+  // isn't left in the address bar/history). Otherwise show the normal profile list.
+  useEffect(() => {
+    const h = typeof window !== 'undefined' ? parseUaleHandoff(window.location.search) : null
+    if (h) {
+      enterAsUale(h.profileId, h.displayName)
+      if (typeof window !== 'undefined') window.history.replaceState({}, '', window.location.pathname)
+    } else {
+      setUsers(storage.listUsers())
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const persist = (next) => { setState(next); storage.save(next.userId, next) }
   // Remember the most recent activity so the dashboard can offer "continue".
   const noteActivity = (activity) => { if (state) persist({ ...state, lastActivity: activity }) }
 
-  const login = (name) => {
-    const id = name.trim()
-    if (!id) return
+  // Load-or-create a profile by id and heal it forward (shared by manual login and
+  // the UALE handoff so both paths stay identical).
+  const hydrate = (id) => {
     let s = storage.load(id)
     if (!s) { s = blankState(id); storage.save(id, s) }
     const fresh = blankState(id)
     for (const d of Object.keys(fresh.domains))
       for (const sk of Object.keys(fresh.domains[d]))
         if (!s.domains[d]?.[sk]) { s.domains[d] = s.domains[d] || {}; s.domains[d][sk] = fresh.domains[d][sk] }
-    // Heal states saved before per-category stats existed.
     if (!s.domainStats) s.domainStats = fresh.domainStats
     else for (const d of Object.keys(fresh.domainStats))
       if (!s.domainStats[d]) s.domainStats[d] = fresh.domainStats[d]
+    return s
+  }
+
+  const login = (name) => {
+    const id = name.trim()
+    if (!id) return
+    const s = hydrate(id)
+    setUserId(id); setState(s); setUsers(storage.listUsers()); setPage('dashboard')
+  }
+
+  // Enter directly from a UALE launch — no profile-name step. `id` is the learner-
+  // specific "uale:<opaque key>" profile, so different UALE learners never merge, and
+  // a returning learner resumes their existing progress. `displayName` is cosmetic.
+  const enterAsUale = (id, displayName) => {
+    const s = hydrate(id)
+    if (displayName) s.displayName = displayName
+    s.viaUale = true
+    storage.save(id, s)
     setUserId(id); setState(s); setUsers(storage.listUsers()); setPage('dashboard')
   }
 
@@ -344,7 +374,7 @@ export default function App() {
               <div className="w-9 h-9 rounded-xl bg-uale-brass-soft border border-uale-stone-200 grid place-items-center"><Flame className="w-4 h-4 text-uale-brass-2" /></div>
               <div>
                 <p className="font-uale-serif text-[17px] font-semibold leading-tight text-uale-ink">FCTC</p>
-                <p className="text-uale-sec text-xs">Firefighter Written Test Prep · {userId}</p>
+                <p className="text-uale-sec text-xs">Firefighter Written Test Prep · {state?.displayName || userId}</p>
               </div>
             </div>
             <button onClick={logout} className="flex items-center gap-2 text-sm text-uale-sec hover:text-uale-ink-2">
