@@ -31,8 +31,36 @@ export default function CfaExperience() {
   const [state, setState] = useState(() => emptyCfaState());
   const [view, setView] = useState('home');
   const [session, setSession] = useState(null); // { queue, idx, picked, revealed, label }
-  useEffect(() => { setState(loadCfaState()); }, []);
-  const persist = (next) => { setState(next); saveCfaState(next); };
+  const [saveState, setSaveState] = useState('idle'); // idle | saving | saved | error
+  const saveTimer = useRef(null);
+  const learnerKeyRef = useRef(null); // per-learner storage key (UALE handoff lid) — no cross-learner merge
+  useEffect(() => {
+    let lid = null, nm = null;
+    if (typeof window !== 'undefined') {
+      try {
+        const p = new URLSearchParams(window.location.search);
+        lid = p.get('lid'); nm = p.get('name');
+        // Strip the handoff from the URL (privacy) after reading it.
+        if (/[?&](src|lid|name)=/.test(window.location.search)) window.history.replaceState({}, '', window.location.pathname);
+      } catch { /* ignore */ }
+    }
+    learnerKeyRef.current = lid || null;
+    let s = loadCfaState(learnerKeyRef.current); // this learner's OWN state
+    if (nm) s = { ...s, learnerName: nm.slice(0, 60) };
+    setState(s);
+    if (s.learnerName) saveCfaState(s, learnerKeyRef.current);
+  }, []);
+  // Autosave — and make it visible (device-local; no manual Save button). Always
+  // scoped to this learner's key so different UALE learners never merge.
+  const persist = (next) => {
+    setState(next);
+    setSaveState('saving');
+    try {
+      saveCfaState(next, learnerKeyRef.current);
+      if (saveTimer.current) clearTimeout(saveTimer.current);
+      saveTimer.current = setTimeout(() => setSaveState('saved'), 450);
+    } catch { setSaveState('error'); }
+  };
 
   const registry = useMemo(() => metricsRegistryFor('cfa-level-1'), []);
   const analysis = useMemo(() => analyzeSkills(state.domains, registry), [state, registry]);
@@ -53,7 +81,7 @@ export default function CfaExperience() {
   };
 
   // ---- session builders ---------------------------------------------------------
-  const buildQueue = (cells, n, label) => {
+  const buildQueue = (cells, n, label, activity) => {
     const rng = rngFrom(Math.floor((typeof performance !== 'undefined' ? performance.now() : 1) * 1000) % 2147483647 || 7);
     const q = [];
     // Anti-repetition: avoid concepts seen recently (across sessions) AND within this
@@ -64,17 +92,25 @@ export default function CfaExperience() {
       const item = generateVariedItem({ topic: c.topic, subskill: c.subskill, rng, avoidConcepts: avoid });
       if (item) { q.push(item); avoid.unshift(item.concept); if (avoid.length > 8) avoid.pop(); }
     }
+    if (activity) persist({ ...state, lastActivity: { ...activity, label } }); // remember for Welcome-back / Continue
     setSession({ queue: q, idx: 0, picked: null, revealed: false, label });
     setView('practice');
   };
   const startTopic = (t) => {
     const cells = generatableCells().filter((c) => c.topic === t);
-    if (cells.length) buildQueue(cells, 6, TOPICS[t].label);
+    if (cells.length) buildQueue(cells, 6, TOPICS[t].label, { kind: 'topic', topic: t });
   };
-  const startMixed = (n, label) => buildQueue(shuffle(generatableCells()), n, label);
+  const startMixed = (n, label) => buildQueue(shuffle(generatableCells()), n, label, { kind: 'mixed' });
   const startDiagnostic = () => {
     const { plan } = buildCfaDiagnostic(rngFrom(99), { perCell: 1 });
-    buildQueue(plan, plan.length, 'Diagnostic');
+    buildQueue(plan, plan.length, 'Diagnostic', { kind: 'diagnostic' });
+  };
+  const continueLast = () => {
+    const a = state.lastActivity;
+    if (!a) return;
+    if (a.kind === 'topic' && a.topic) startTopic(a.topic);
+    else if (a.kind === 'mixed') startMixed(10, 'Mixed practice');
+    else startDiagnostic();
   };
 
   // ---- answering ----------------------------------------------------------------
@@ -137,9 +173,19 @@ export default function CfaExperience() {
     <div className="min-h-screen bg-uale-ivory text-uale-text">
       <header className="bg-uale-hero-3 text-uale-cream">
         <div className="max-w-4xl mx-auto px-6 py-6">
-          <a href={UALE_HOME} className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-uale-cream-dim hover:text-uale-cream">
-            <ArrowLeft className="w-4 h-4" /> Back to UALE
-          </a>
+          <div className="flex items-center justify-between gap-3">
+            <a href={UALE_HOME} className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-uale-cream-dim hover:text-uale-cream">
+              <ArrowLeft className="w-4 h-4" /> Back to UALE
+            </a>
+            {/* Save confidence — calm; also discloses progress is device-local. */}
+            <span className={'flex items-center gap-1.5 text-xs ' + (saveState === 'error' ? 'text-rose-200' : 'text-uale-cream-dim')}>
+              {saveState === 'saving'
+                ? 'Saving…'
+                : saveState === 'error'
+                  ? 'Unable to save'
+                  : <><CheckCircle2 className="w-3.5 h-3.5" /> Progress saved on this device</>}
+            </span>
+          </div>
           <p className="mt-4 text-xs uppercase tracking-[0.17em] text-uale-champagne">UALE · Professional Certification</p>
           <h1 className="font-uale-serif text-3xl font-semibold mt-1">CFA Level I</h1>
           <p className="text-sm text-uale-cream-dim mt-1">{PRACTICE_LABEL} — original items aligned to the official topic blueprint. Not affiliated with or endorsed by CFA Institute.</p>
@@ -158,6 +204,18 @@ export default function CfaExperience() {
   function renderHome() {
     return (
       <>
+        {/* Welcome back / resume — the return state. */}
+        {state.lastActivity && (
+          <section className="mb-4">
+            <p className="font-uale-serif text-[1.3rem] font-semibold text-uale-ink [text-wrap:pretty]">
+              Welcome back{state.learnerName ? `, ${state.learnerName}` : ''} — pick up where you left off.
+            </p>
+            <button onClick={continueLast} className={btn + ' mt-3'}>
+              Continue {state.lastActivity.label} <ArrowRight className="w-4 h-4" />
+            </button>
+          </section>
+        )}
+
         {/* Readiness */}
         <section className="bg-uale-card border border-uale-stone-200 rounded-2xl p-6 shadow-sm">
           <div className="flex items-center gap-2 text-uale-sec text-sm"><TrendingUp className="w-4 h-4" /> Readiness</div>
@@ -201,6 +259,7 @@ export default function CfaExperience() {
               <AreaColumn title="Strong areas" tone="sage" empty="None demonstrated yet.">
                 {topicAnalysis.strong.map((x) => (
                   <AreaRow key={x.topic} label={TOPICS[x.topic].label} meta={`Mastery ${Math.round(x.mastery * 100)}%`} tone="sage"
+                    pattern="Transfer demonstrated — correct across more than one question type."
                     action={<button onClick={() => startTopic(x.topic)} className={chipBtn}>Keep sharp</button>} />
                 ))}
               </AreaColumn>
@@ -217,6 +276,7 @@ export default function CfaExperience() {
                 <AreaColumn title="Developing" tone="stone" empty="">
                   {topicAnalysis.developing.map((x) => (
                     <AreaRow key={x.topic} label={TOPICS[x.topic].label} meta={`Mastery ${Math.round(x.mastery * 100)}%`} tone="stone"
+                      pattern={x.needsTransfer ? 'Good accuracy — try a different question type (concept/scenario) to confirm mastery.' : null}
                       action={<button onClick={() => startTopic(x.topic)} className={chipBtn}>Strengthen</button>} />
                   ))}
                 </AreaColumn>
