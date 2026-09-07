@@ -259,7 +259,7 @@ export default function CfaExperience() {
               <AreaColumn title="Strong areas" tone="sage" empty="None demonstrated yet.">
                 {topicAnalysis.strong.map((x) => (
                   <AreaRow key={x.topic} label={TOPICS[x.topic].label} meta={`Mastery ${Math.round(x.mastery * 100)}%`} tone="sage"
-                    pattern="Transfer demonstrated — correct across more than one question type."
+                    pattern="Transfer demonstrated — correct across more than one question type." trend={x.trend}
                     action={<button onClick={() => startTopic(x.topic)} className={chipBtn}>Keep sharp</button>} />
                 ))}
               </AreaColumn>
@@ -267,7 +267,7 @@ export default function CfaExperience() {
               <AreaColumn title="Focus areas" tone="amber" empty="Nothing flagged — nice.">
                 {topicAnalysis.focus.map((x) => (
                   <AreaRow key={x.topic} label={TOPICS[x.topic].label} meta={`Mastery ${Math.round(x.mastery * 100)}%`} tone="amber"
-                    pattern={x.pattern ? `Pattern Alyce noticed: you appear to be ${x.pattern.phrase}.` : null}
+                    pattern={x.pattern ? `Pattern Alyce noticed: you appear to be ${x.pattern.phrase}.` : null} trend={x.trend}
                     action={<button onClick={() => startTopic(x.topic)} className={chipBtnPrimary}>Practice this topic</button>} />
                 ))}
               </AreaColumn>
@@ -276,7 +276,7 @@ export default function CfaExperience() {
                 <AreaColumn title="Developing" tone="stone" empty="">
                   {topicAnalysis.developing.map((x) => (
                     <AreaRow key={x.topic} label={TOPICS[x.topic].label} meta={`Mastery ${Math.round(x.mastery * 100)}%`} tone="stone"
-                      pattern={x.needsTransfer ? 'Good accuracy — try a different question type (concept/scenario) to confirm mastery.' : null}
+                      pattern={x.needsTransfer ? 'Good accuracy — try a different question type (concept/scenario) to confirm mastery.' : null} trend={x.trend}
                       action={<button onClick={() => startTopic(x.topic)} className={chipBtn}>Strengthen</button>} />
                   ))}
                 </AreaColumn>
@@ -516,15 +516,31 @@ function AreaColumn({ title, tone, empty, children }) {
   );
 }
 
-function AreaRow({ label, meta, pattern, action }) {
+function AreaRow({ label, meta, pattern, trend, action }) {
   return (
     <div>
       <div className="flex items-center justify-between gap-2">
-        <span className="text-[13.5px] font-medium text-uale-ink">{label}</span>
+        <span className="flex items-center gap-1.5 text-[13.5px] font-medium text-uale-ink">
+          {label}
+          <TrendChip trend={trend} />
+        </span>
         <span className="text-[12px] text-uale-sec tabular-nums">{meta}</span>
       </div>
       {pattern && <p className="mt-1 text-[12.5px] text-amber-800">{pattern}</p>}
       {action && <div className="mt-1.5">{action}</div>}
     </div>
   );
+}
+
+// Subtle, evidence-gated trend signal. Only rendered when the engine reports a real
+// direction (it returns null until there's enough history) — never inferred here.
+const TREND_LABEL = { improving: 'Improving', flat: 'Steady', declining: 'Needs more practice' };
+const TREND_STYLE = {
+  improving: 'bg-uale-sage/15 text-uale-sage',
+  flat: 'bg-uale-stone-100 text-uale-sec',
+  declining: 'bg-amber-100 text-amber-800',
+};
+function TrendChip({ trend }) {
+  if (!trend || !TREND_LABEL[trend]) return null;
+  return <span className={'px-1.5 py-0.5 rounded-full text-[10.5px] font-semibold uppercase tracking-wide ' + TREND_STYLE[trend]}>{TREND_LABEL[trend]}</span>;
 }

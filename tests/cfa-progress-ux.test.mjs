@@ -6,6 +6,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 import { emptyCfaState, recordCfaAnswer, cfaStorageKey } from '../lib/certifications/cfa/cfaStore.mjs';
+import { cfaTopicAnalysis } from '../lib/certifications/cfa/cfaEngine.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(HERE, '..');
@@ -38,6 +39,50 @@ test('CfaExperience scopes storage to the handoff learner key', () => {
   assert.match(c, /loadCfaState\(learnerKeyRef\.current\)/);
   assert.match(c, /saveCfaState\(next, learnerKeyRef\.current\)/);
   assert.match(c, /replaceState/); // strips the handoff from the URL
+});
+
+// ---- Trend UX (evidence-gated, engine-driven) ----------------------------------
+// Ordered history from a 'c'/'w' string, so early-vs-late accuracy is controllable.
+function seq(pattern) {
+  const history = [...pattern].map((ch) => ({ c: ch === 'c', d: 2 }));
+  const correct = history.filter((h) => h.c).length;
+  return { attempts: history.length, correct, streak: 0, difficulty: 2, dueIn: 0, lastSeen: 0, history };
+}
+const rowFor = (a, topic) => [...a.strong, ...a.focus, ...a.developing].find((x) => x.topic === topic);
+
+test('trend: improving learner (early misses, later hits) reads as improving', () => {
+  const a = cfaTopicAnalysis({ quant: { tvm: seq('wwwwcccc') } }, {});
+  const row = rowFor(a, 'quant');
+  assert.ok(row, 'evaluated topic produces a row');
+  assert.equal(row.trend, 'improving');
+});
+
+test('trend: flat learner (steady accuracy) reads as flat, not a false direction', () => {
+  const a = cfaTopicAnalysis({ quant: { tvm: seq('cwcwcwcw') } }, {});
+  assert.equal(rowFor(a, 'quant').trend, 'flat');
+});
+
+test('trend: declining/inconsistent learner reads as declining', () => {
+  const a = cfaTopicAnalysis({ quant: { tvm: seq('ccccwwww') } }, {});
+  assert.equal(rowFor(a, 'quant').trend, 'declining');
+});
+
+test('trend: sparse evidence makes NO trend claim (below MIN_EVIDENCE)', () => {
+  const a = cfaTopicAnalysis({ quant: { tvm: seq('cw') } }, {});
+  // Two attempts → untested/insufficient, so no evaluated row and no trend claim.
+  assert.equal(rowFor(a, 'quant'), undefined);
+  assert.ok(a.needEvidence.includes('quant'));
+});
+
+test('CfaExperience surfaces the trend chip only when the engine reports a direction', () => {
+  const c = cmp();
+  assert.match(c, /TrendChip/);
+  assert.match(c, /trend=\{x\.trend\}/);
+  assert.match(c, /Improving/);
+  assert.match(c, /Steady/);
+  assert.match(c, /Needs more practice/);
+  // Never rendered without a real direction.
+  assert.match(c, /if \(!trend \|\| !TREND_LABEL\[trend\]\) return null/);
 });
 
 test('CFA surfaces save confidence, welcome-back/resume, and transfer status', () => {
