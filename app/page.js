@@ -57,6 +57,8 @@ export default function App() {
   const [nameInput, setNameInput] = useState('')
   const [users, setUsers] = useState([])
   const [state, setState] = useState(null)
+  const [saveState, setSaveState] = useState('idle') // idle | saving | saved | error — learner save confidence
+  const saveTimer = useRef(null)
 
   const [queue, setQueue] = useState([])
   const [qIndex, setQIndex] = useState(0)
@@ -85,7 +87,20 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  const persist = (next) => { setState(next); storage.save(next.userId, next) }
+  // Autosave — and make it visible/trustworthy. localStorage is synchronous, so we
+  // flash a brief "Saving…" then settle on "Progress saved on this device" (which also
+  // conveys the device-local nature); a failure surfaces "Unable to save".
+  const persist = (next) => {
+    setState(next)
+    setSaveState('saving')
+    try {
+      storage.save(next.userId, next)
+      if (saveTimer.current) clearTimeout(saveTimer.current)
+      saveTimer.current = setTimeout(() => setSaveState('saved'), 450)
+    } catch {
+      setSaveState('error')
+    }
+  }
   // Remember the most recent activity so the dashboard can offer "continue".
   const noteActivity = (activity) => { if (state) persist({ ...state, lastActivity: activity }) }
 
@@ -363,6 +378,9 @@ export default function App() {
     // (the trend needs enough evidence — no decorative percentages).
     const analysis = analyzeSkills(state)
     const improving = analysis.filter(c => c.trend?.trend === 'improving').slice(0, 3)
+    // Strengths = DEMONSTRATED strong (evaluated + high recent accuracy), never mere
+    // low activity. Untested/insufficient never appear here.
+    const strong = analysis.filter(c => c.demonstratedStrong).sort((a, b) => b.mastery - a.mastery).slice(0, 5)
     const skillClass = {}; for (const c of analysis) skillClass[c.domain + '::' + c.subskill] = c
     const cont = state.lastActivity
 
@@ -377,13 +395,28 @@ export default function App() {
                 <p className="text-uale-sec text-xs">Firefighter Written Test Prep · {state?.displayName || userId}</p>
               </div>
             </div>
-            <button onClick={logout} className="flex items-center gap-2 text-sm text-uale-sec hover:text-uale-ink-2">
-              <LogOut className="w-4 h-4" /> Switch profile
-            </button>
+            <div className="flex items-center gap-4">
+              {/* Save confidence — calm, non-nagging; also states progress is device-local. */}
+              <span className={'hidden sm:flex items-center gap-1.5 text-xs ' + (saveState === 'error' ? 'text-rose-600' : saveState === 'saving' ? 'text-uale-faint' : 'text-uale-sec')}>
+                {saveState === 'saving'
+                  ? <><RotateCcw className="w-3.5 h-3.5 animate-spin" /> Saving…</>
+                  : saveState === 'error'
+                    ? <><AlertTriangle className="w-3.5 h-3.5" /> Unable to save</>
+                    : <><CheckCircle2 className="w-3.5 h-3.5 text-uale-sage" /> Progress saved on this device</>}
+              </span>
+              <button onClick={logout} className="flex items-center gap-2 text-sm text-uale-sec hover:text-uale-ink-2">
+                <LogOut className="w-4 h-4" /> Switch profile
+              </button>
+            </div>
           </div>
         </header>
 
         <main className="max-w-5xl mx-auto px-6 py-8">
+          {cont && !fresh && (
+            <p className="mb-3 font-uale-serif text-[1.35rem] font-semibold text-uale-ink [text-wrap:pretty]">
+              Welcome back, {state?.displayName || userId} — pick up where you left off.
+            </p>
+          )}
           {(cont || improving.length > 0) && (
             <section className="mb-4 flex flex-wrap items-center gap-3">
               {cont && (
@@ -433,7 +466,7 @@ export default function App() {
               )}
             </div>
             <div className={'p-6 flex flex-col ' + CARD}>
-              <div className="flex items-center gap-2 text-uale-faint text-xs font-semibold uppercase tracking-wide"><Target className="w-4 h-4" /> Recommended next</div>
+              <div className="flex items-center gap-2 text-uale-faint text-xs font-semibold uppercase tracking-wide"><Target className="w-4 h-4" /> Alyce recommends</div>
               <div className="mt-3 flex-1">
                 <p className="font-uale-serif text-[1.4rem] font-semibold leading-snug text-uale-ink [text-wrap:pretty]">
                   {nba.skill?.subskillLabel || nba.title}
@@ -548,6 +581,26 @@ export default function App() {
               })}
             </div>
           </section>
+
+          {strong.length > 0 && (
+            <section className={'mt-8 p-6 ' + CARD}>
+              <h2 className="text-xs font-semibold uppercase tracking-wide text-uale-faint mb-4">Strengths</h2>
+              <div className="space-y-3">
+                {strong.map((c, i) => (
+                  <div key={i} className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-uale-ink-2">{c.subskillLabel}
+                        <span className="text-uale-faint font-normal"> · {c.domainLabel}</span></p>
+                      <p className="text-xs text-uale-sage">Strong · consistent correct performance across recent practice</p>
+                    </div>
+                    <div className="w-24 h-1.5 rounded-full bg-uale-stone-100 overflow-hidden">
+                      <div className="h-full bg-uale-sage" style={{ width: Math.round(c.mastery * 100) + '%' }} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
 
           {!fresh && (
             <section className={'mt-8 p-6 ' + CARD}>
