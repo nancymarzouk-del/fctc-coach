@@ -88,7 +88,7 @@ test('empty SIE state carries resume + evidence structures and records immutably
   assert.deepEqual(next.lastActivity, { kind: 'section', topic: 'products', label: 'x' });
   assert.equal(next.learnerName, 'Stefan');
   assert.equal(next.totalAnswered, 1);
-  assert.equal(next.transfer.products.compare.total, 1);
+  assert.equal(next.transfer['products:equity'].compare.total, 1);
   assert.equal(next.misconceptions.counts['common-vs-preferred-rights'], 1);
 });
 
@@ -120,13 +120,12 @@ test('SieExperience shell is honest and evidence-aware (no fake readiness/weakne
   assert.match(c, /saved on this device/);                    // device-local disclosure
   assert.match(c, /Welcome back/); assert.match(c, /continueLast/); assert.match(c, /lastActivity/);
   assert.match(c, /Not yet assessed/);                        // honest baseline
-  assert.match(c, /Start building your SIE baseline/);        // Alyce placeholder (state-driven)
-  assert.match(c, /Alyce recommends/);
+  assert.match(c, /Alyce recommends/);                        // Alyce card (copy is evidence-driven, not hard-coded)
   assert.match(c, /loadSieState\(learnerKeyRef\.current\)/);  // per-learner load
   assert.match(c, /saveSieState\(next, learnerKeyRef\.current\)/);
   assert.match(c, /replaceState/);                            // strips handoff from URL
   assert.match(c, /TOPIC_ORDER\.map/);                        // the four sections rendered
-  // No fabricated readiness percentage anywhere in the shell.
+  // No fabricated readiness percentage anywhere. (Fresh-learner honesty — no strong/
+  // focus without evidence — is verified by the sieConceptAnalysis logic tests.)
   assert.ok(!/readiness[^]*\d+%/i.test(c), 'no fake readiness %');
-  assert.ok(!/Strong areas|weak area/i.test(c), 'no fabricated strengths/weaknesses in the shell');
 });
