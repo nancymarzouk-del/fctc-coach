@@ -17,7 +17,9 @@ import { generateVariedItem, buildTmDiagnostic, generatableCells, tmConceptAnaly
 import { familyLabel, familyOf } from '../../lib/certifications/tm/families.mjs';
 import { recurringMisconceptions, misconceptionPhrase } from '../../lib/misconceptions.mjs';
 import { loadTmState, saveTmState, recordTmAnswer } from '../../lib/certifications/tm/tmStore.mjs';
+import { loadLearnState, isFreshLearner } from '../../lib/certifications/tm/tmLearnStore.mjs';
 import TmApplication from './TmApplication';
+import TmLearn from './TmLearn';
 
 const UALE_HOME = 'https://florence-sand-phi.vercel.app/';
 function rngFrom(seed) { let s = (seed >>> 0) || 1; return () => { s = (Math.imul(s, 1103515245) + 12345) & 0x7fffffff; return s / 0x7fffffff; }; }
@@ -27,7 +29,10 @@ function seed() { return (Math.floor((typeof performance !== 'undefined' ? perfo
 export default function TimeMgmtExperience() {
   const [state, setState] = useState(() => loadTmState(null));
   const [view, setView] = useState('home'); // home | practice
-  const [mode, setMode] = useState('practice'); // practice (learn the skill) | application (Plan My Day)
+  // Three modes: learn (understand the skill first), practice (adaptive evidence
+  // engine), application (Plan My Day). Fresh learners default into LEARN so they
+  // are never dropped straight into a question stream.
+  const [mode, setMode] = useState('practice'); // learn | practice | application
   const todayStr = useMemo(() => { try { return new Date().toISOString().slice(0, 10); } catch { return null; } }, []);
   const [session, setSession] = useState(null);
   const [saveState, setSaveState] = useState('idle');
@@ -46,6 +51,12 @@ export default function TimeMgmtExperience() {
     if (nm) s = { ...s, learnerName: nm.slice(0, 60) };
     setState(s);
     if (s.learnerName) saveTmState(s, learnerKeyRef.current);
+    // A brand-new learner (no practice history AND no lesson progress) starts in
+    // LEARN — teach before test. Returning learners keep the default (Practice).
+    try {
+      const practiceFresh = !s.lastActivity && !(s.answers && s.answers.length);
+      if (practiceFresh && isFreshLearner(loadLearnState(learnerKeyRef.current))) setMode('learn');
+    } catch { /* keep default */ }
   }, []);
 
   const persist = (next) => {
@@ -103,6 +114,16 @@ export default function TimeMgmtExperience() {
     else if (rec.kind === 'mixed') startMixed(10);
     else startDiagnostic();
   };
+  // From Learn mode's "prove it in Practice" CTA: switch to Practice and start a
+  // focused session on that competency. Practice stays the independent evidence
+  // engine — Learn never writes mastery.
+  const goPracticeTopic = (topic) => {
+    setMode('practice');
+    try {
+      const cell = generatableCells().find((c) => c.topic === topic);
+      if (cell) startArea(cell.topic, cell.subskill);
+    } catch { /* stay on practice home */ }
+  };
 
   // ---- answering: ASSESS → DIAGNOSE → PRACTICE DIFFERENTLY → ADAPT ----------------
   const q = session && session.queue[session.idx];
@@ -157,17 +178,21 @@ export default function TimeMgmtExperience() {
       </header>
 
       <main className="max-w-4xl mx-auto px-6 py-6">
-        {/* Mode switch — LEARNING (practice the skill) vs APPLICATION (use it on your
-            real day). Hidden inside an active practice session to keep focus. */}
+        {/* Mode switch — LEARN (understand the skill), PRACTICE (adaptive evidence
+            engine), PLAN MY DAY (apply it to a real day). Hidden inside an active
+            practice session to keep focus. */}
         {(view !== 'practice' || !session) && (
           <div className="mb-5 inline-flex rounded-full border border-uale-stone-200 bg-uale-card p-1 text-[13px] font-semibold">
+            <button onClick={() => setMode('learn')} className={'rounded-full px-3.5 py-1.5 ' + (mode === 'learn' ? 'bg-uale-ink text-uale-cream' : 'text-uale-sec hover:text-uale-ink')}>Learn</button>
             <button onClick={() => setMode('practice')} className={'rounded-full px-3.5 py-1.5 ' + (mode === 'practice' ? 'bg-uale-ink text-uale-cream' : 'text-uale-sec hover:text-uale-ink')}>Practice</button>
             <button onClick={() => setMode('application')} className={'rounded-full px-3.5 py-1.5 ' + (mode === 'application' ? 'bg-uale-ink text-uale-cream' : 'text-uale-sec hover:text-uale-ink')}>Plan My Day</button>
           </div>
         )}
-        {mode === 'application'
-          ? <TmApplication learnerKey={learnerKeyRef.current} today={todayStr} />
-          : (view === 'practice' && session ? renderPractice() : renderHome())}
+        {mode === 'learn'
+          ? <TmLearn learnerKey={learnerKeyRef.current} onGoPractice={goPracticeTopic} />
+          : mode === 'application'
+            ? <TmApplication learnerKey={learnerKeyRef.current} today={todayStr} />
+            : (view === 'practice' && session ? renderPractice() : renderHome())}
       </main>
     </div>
   );
