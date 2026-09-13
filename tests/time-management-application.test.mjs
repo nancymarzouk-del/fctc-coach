@@ -103,6 +103,16 @@ test('review captures actual vs estimated time and coaches (no mastery write)', 
   assert.equal(reviewInsight(s.tasks[0]).kind, 'underestimate');
 });
 
+// ---- completed tasks surface the estimate-vs-actual coaching (regression) --------
+test('completed tasks have a home that surfaces estimate-vs-actual coaching', () => {
+  const c = read('components/tm/TmApplication.jsx');
+  assert.match(c, /Completed today/);                                  // section exists
+  assert.match(c, /filter\(\(t\) => t\.status === 'done'\)/);          // lists done tasks
+  assert.match(c, /<ReviewNote task=\{t\} \/>/);                       // renders the coaching note
+  // the surfaced logic classifies a 1.5x overrun as underestimate
+  assert.equal(reviewInsight({ title: 'x', estimatedMinutes: 20, actualMinutes: 30 }).kind, 'underestimate');
+});
+
 // ---- coaching insights are observations, not labels -----------------------------
 test('insights surface overcommitment / vague framing without labeling the learner', () => {
   const ins = applicationInsights(scenario());

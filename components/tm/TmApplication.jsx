@@ -177,6 +177,24 @@ export default function TmApplication({ learnerKey, today }) {
             )}
           </section>
 
+          {/* completed today — surfaces the estimate-vs-actual coaching after a task
+              is marked done (done tasks leave the active plan). */}
+          {state.tasks.some((t) => t.status === 'done') && (
+            <section className="mb-4 rounded-2xl border border-uale-stone-200 bg-uale-card p-5">
+              <p className="mb-2 text-[13px] font-semibold text-uale-ink">Completed today</p>
+              <ul className="space-y-2">
+                {state.tasks.filter((t) => t.status === 'done').map((t) => (
+                  <li key={t.id} className="text-[13px] text-uale-text">
+                    <span className="inline-flex items-center gap-1.5"><CheckCircle2 className="h-3.5 w-3.5 text-uale-sage" /> {t.title}
+                      {t.actualMinutes ? <span className="text-uale-faint">— {hm(t.actualMinutes)} actual{t.estimatedMinutes ? ` (est ${hm(t.estimatedMinutes)})` : ''}</span> : null}
+                    </span>
+                    <ReviewNote task={t} />
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+
           {/* coaching insights */}
           {insights.length > 0 && (
             <section className="mb-4 rounded-2xl border border-uale-stone-200 bg-uale-card p-5">
