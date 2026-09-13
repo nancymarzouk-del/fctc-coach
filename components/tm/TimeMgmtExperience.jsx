@@ -17,6 +17,7 @@ import { generateVariedItem, buildTmDiagnostic, generatableCells, tmConceptAnaly
 import { familyLabel, familyOf } from '../../lib/certifications/tm/families.mjs';
 import { recurringMisconceptions, misconceptionPhrase } from '../../lib/misconceptions.mjs';
 import { loadTmState, saveTmState, recordTmAnswer } from '../../lib/certifications/tm/tmStore.mjs';
+import TmApplication from './TmApplication';
 
 const UALE_HOME = 'https://florence-sand-phi.vercel.app/';
 function rngFrom(seed) { let s = (seed >>> 0) || 1; return () => { s = (Math.imul(s, 1103515245) + 12345) & 0x7fffffff; return s / 0x7fffffff; }; }
@@ -26,6 +27,8 @@ function seed() { return (Math.floor((typeof performance !== 'undefined' ? perfo
 export default function TimeMgmtExperience() {
   const [state, setState] = useState(() => loadTmState(null));
   const [view, setView] = useState('home'); // home | practice
+  const [mode, setMode] = useState('practice'); // practice (learn the skill) | application (Plan My Day)
+  const todayStr = useMemo(() => { try { return new Date().toISOString().slice(0, 10); } catch { return null; } }, []);
   const [session, setSession] = useState(null);
   const [saveState, setSaveState] = useState('idle');
   const saveTimer = useRef(null);
@@ -154,7 +157,17 @@ export default function TimeMgmtExperience() {
       </header>
 
       <main className="max-w-4xl mx-auto px-6 py-6">
-        {view === 'practice' && session ? renderPractice() : renderHome()}
+        {/* Mode switch — LEARNING (practice the skill) vs APPLICATION (use it on your
+            real day). Hidden inside an active practice session to keep focus. */}
+        {(view !== 'practice' || !session) && (
+          <div className="mb-5 inline-flex rounded-full border border-uale-stone-200 bg-uale-card p-1 text-[13px] font-semibold">
+            <button onClick={() => setMode('practice')} className={'rounded-full px-3.5 py-1.5 ' + (mode === 'practice' ? 'bg-uale-ink text-uale-cream' : 'text-uale-sec hover:text-uale-ink')}>Practice</button>
+            <button onClick={() => setMode('application')} className={'rounded-full px-3.5 py-1.5 ' + (mode === 'application' ? 'bg-uale-ink text-uale-cream' : 'text-uale-sec hover:text-uale-ink')}>Plan My Day</button>
+          </div>
+        )}
+        {mode === 'application'
+          ? <TmApplication learnerKey={learnerKeyRef.current} today={todayStr} />
+          : (view === 'practice' && session ? renderPractice() : renderHome())}
       </main>
     </div>
   );
