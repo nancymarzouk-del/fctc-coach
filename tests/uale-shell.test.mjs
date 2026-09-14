@@ -131,6 +131,15 @@ test('FCTC: reuses the shared BackToUale control inside its own header, keeping 
   assert.match(src, /UALE<\/p>/);            // UALE identity added to the header
 });
 
+test('FCTC entering a uale: profile (Continue-as chip) shows Back to UALE, not only via live handoff', () => {
+  const src = read('app/page.js');
+  // login() (used by both typed entry and the "Continue as" chips) recomputes fromUale
+  // from the profile id, so a uale: profile shows the return control even with no marker.
+  assert.match(src, /const login = \(name\)[\s\S]*?setFromUale\(detectLaunchedFromUale\(id\)\)/);
+  // a uale: profile is launched-from-UALE regardless of the device marker
+  assert.equal(launchedFromUale('uale:prodval1'), true);
+});
+
 // ================= no regressions: save/resume still wired =================
 test('save/resume remains wired in every module (shell change is header-only)', () => {
   assert.match(read('app/page.js'), /storage\.save\(/); assert.match(read('app/page.js'), /storage\.load\(/);
