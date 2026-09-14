@@ -21,6 +21,9 @@ import { loadSieState, saveSieState, recordSieAnswer } from '../../lib/certifica
 
 import ExternalModuleShell from '../ExternalModuleShell';
 import { noteUaleLaunch, launchedFromUale as detectLaunchedFromUale } from '../../lib/ualeSession.mjs';
+import { loadActiveSession, saveActiveSession, clearActiveSession, sessionToRecord, resumeSummary, isResumable, isComplete, nextUnansweredIndex } from '../../lib/activeSession.mjs';
+
+const RESUME_MODULE = 'sie';
 function rngFrom(seed) { let s = (seed >>> 0) || 1; return () => { s = (Math.imul(s, 1103515245) + 12345) & 0x7fffffff; return s / 0x7fffffff; }; }
 function shuffle(a) { const r = [...a]; for (let i = r.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [r[i], r[j]] = [r[j], r[i]]; } return r; }
 function seed() { return (Math.floor((typeof performance !== 'undefined' ? performance.now() : 1) * 1000) % 2147483647) || 7; }
@@ -33,6 +36,12 @@ export default function SieExperience() {
   const saveTimer = useRef(null);
   const learnerKeyRef = useRef(null);
   const [fromUale, setFromUale] = useState(false); // launched from UALE → show Back to UALE
+  const [resumable, setResumable] = useState(null); // incomplete session, if any
+  const refreshResumable = () => {
+    const rec = loadActiveSession(RESUME_MODULE, learnerKeyRef.current);
+    if (rec && isComplete(rec)) { clearActiveSession(RESUME_MODULE, learnerKeyRef.current); setResumable(null); return; }
+    setResumable(resumeSummary(rec));
+  };
 
   useEffect(() => {
     let lid = null, nm = null;
@@ -44,11 +53,17 @@ export default function SieExperience() {
     } catch { /* SSR */ }
     learnerKeyRef.current = lid || null;
     setFromUale(detectLaunchedFromUale(learnerKeyRef.current));
+    refreshResumable();
     let s = loadSieState(learnerKeyRef.current);
     if (nm) s = { ...s, learnerName: nm.slice(0, 60) };
     setState(s);
     if (s.learnerName) saveSieState(s, learnerKeyRef.current);
   }, []);
+  // Persist the in-progress session (for resume) whenever it changes.
+  useEffect(() => {
+    if (session && session.queue) saveActiveSession(sessionToRecord(session, { module: RESUME_MODULE, learnerKey: learnerKeyRef.current, nowMs: Date.now() }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session]);
 
   const persist = (next) => {
     setState(next);
@@ -86,7 +101,7 @@ export default function SieExperience() {
       if (item) { q.push(item); avoid.unshift(item.concept); if (avoid.length > 10) avoid.pop(); }
     }
     if (activity) persist({ ...state, lastActivity: { ...activity, label } });
-    setSession({ queue: q, idx: 0, picked: null, revealed: false, label });
+    setSession({ queue: q, idx: 0, picked: null, revealed: false, label, answers: {}, sessionType: (activity && activity.kind) || 'practice', sessionId: `${RESUME_MODULE}-${Date.now()}`, startedAt: Date.now(), targetCount: q.length });
     setView('practice');
   };
   const startArea = (topic, subskill) => buildQueue([{ topic, subskill }], 6, areaLabel(topic, subskill), { kind: 'area', topic, subskill });
@@ -124,12 +139,26 @@ export default function SieExperience() {
     setSession((s) => {
       const queue = s.queue.slice();
       if (reteach) queue.splice(s.idx + 1, 0, { ...reteach, _reteach: true, _fromFamily: q.family });
-      return { ...s, queue, revealed: true, steppedUp: correct && after > before, steppedDown: !correct && after < before };
+      const answers = { ...(s.answers || {}), [s.idx]: { picked: s.picked, correct } };
+      return { ...s, queue, answers, revealed: true, steppedUp: correct && after > before, steppedDown: !correct && after < before };
     });
   };
   const next = () => {
-    if (session.idx + 1 >= session.queue.length) { setSession(null); setView('home'); return; }
+    if (session.idx + 1 >= session.queue.length) {
+      clearActiveSession(RESUME_MODULE, learnerKeyRef.current); setResumable(null); setSession(null); setView('home'); return;
+    }
     setSession((s) => ({ ...s, idx: s.idx + 1, picked: null, revealed: false, steppedUp: false, steppedDown: false }));
+  };
+  // ---- resume / start over -------------------------------------------------------
+  const resumeSession = () => {
+    const rec = loadActiveSession(RESUME_MODULE, learnerKeyRef.current);
+    if (!rec || !isResumable(rec)) { refreshResumable(); return; }
+    const idx = nextUnansweredIndex(rec);
+    setSession({ queue: rec.queue, idx, picked: null, revealed: false, label: rec.label, answers: rec.answers, sessionType: rec.sessionType, sessionId: rec.sessionId, startedAt: rec.startedAt, targetCount: rec.targetCount });
+    setView('practice');
+  };
+  const restartSession = () => {
+    clearActiveSession(RESUME_MODULE, learnerKeyRef.current); setResumable(null); continueLast();
   };
 
   const greetName = state.learnerName ? `, ${state.learnerName}` : '';
@@ -161,7 +190,18 @@ export default function SieExperience() {
     const ca = conceptAnalysis;
     return (
       <>
-        {(state.learnerName || state.lastActivity) && (
+        {resumable && (
+          <section className="mb-5 rounded-2xl border border-uale-brass-lite bg-uale-brass-soft p-5">
+            <p className="text-[11px] font-bold uppercase tracking-[0.15em] text-uale-brass-2">Continue where you left off</p>
+            <p className="mt-1 text-[15px] font-semibold text-uale-ink">{resumable.label || 'Practice session'}</p>
+            <p className="mt-0.5 text-[13px] text-uale-sec">{resumable.completed} of {resumable.total} completed</p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button onClick={resumeSession} className="inline-flex items-center gap-1.5 rounded-lg bg-uale-ink px-3.5 py-2 text-[13px] font-semibold text-uale-cream hover:opacity-90">Continue <ArrowRight className="w-4 h-4" /></button>
+              <button onClick={restartSession} className="inline-flex items-center gap-1.5 rounded-lg border border-uale-stone-300 bg-uale-card px-3.5 py-2 text-[13px] font-semibold text-uale-ink-2 hover:border-uale-stone-400">Start over</button>
+            </div>
+          </section>
+        )}
+        {(state.learnerName || state.lastActivity) && !resumable && (
           <section className="mb-5 rounded-2xl border border-uale-stone-200 bg-uale-card p-5">
             <p className="text-[15px] font-semibold text-uale-ink">Welcome back{greetName} — pick up where you left off.</p>
             {state.lastActivity ? (
