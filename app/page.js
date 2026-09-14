@@ -19,6 +19,8 @@ import MockExam from '../components/MockExam'
 import RecallBoard from '../components/RecallBoard'
 import { classifyRecallDetail, recallStrategy, recordRecallMiss, focusDetailType, detailTypeToBoardKind } from '../lib/recallCoach'
 import { parseUaleHandoff } from '../lib/ualeHandoff.mjs'
+import { BackToUale } from '../components/ExternalModuleShell'
+import { noteUaleLaunch, launchedFromUale as detectLaunchedFromUale } from '../lib/ualeSession.mjs'
 
 const DOMAIN_ICONS = { mechanical: Wrench, math: TrendingUp, reading: BookOpen, recall: Eye }
 // One calm, UALE-consistent chrome treatment for every domain — identity comes
@@ -58,6 +60,7 @@ export default function App() {
   const [users, setUsers] = useState([])
   const [state, setState] = useState(null)
   const [saveState, setSaveState] = useState('idle') // idle | saving | saved | error — learner save confidence
+  const [fromUale, setFromUale] = useState(false)    // launched from UALE → show Back to UALE
   const saveTimer = useRef(null)
 
   const [queue, setQueue] = useState([])
@@ -77,6 +80,7 @@ export default function App() {
   // profile and skip the name screen (and strip the handoff from the URL so the key
   // isn't left in the address bar/history). Otherwise show the normal profile list.
   useEffect(() => {
+    if (typeof window !== 'undefined') noteUaleLaunch(window.location.search) // persist safe "from UALE" marker BEFORE the scrub
     const h = typeof window !== 'undefined' ? parseUaleHandoff(window.location.search) : null
     if (h) {
       enterAsUale(h.profileId, h.displayName)
@@ -84,6 +88,7 @@ export default function App() {
     } else {
       setUsers(storage.listUsers())
     }
+    setFromUale(detectLaunchedFromUale(h ? h.profileId : null))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -391,11 +396,14 @@ export default function App() {
             <div className="flex items-center gap-3">
               <div className="w-9 h-9 rounded-xl bg-uale-brass-soft border border-uale-stone-200 grid place-items-center"><Flame className="w-4 h-4 text-uale-brass-2" /></div>
               <div>
+                <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-uale-brass-2">UALE</p>
                 <p className="font-uale-serif text-[17px] font-semibold leading-tight text-uale-ink">FCTC</p>
                 <p className="text-uale-sec text-xs">Firefighter Written Test Prep · {state?.displayName || userId}</p>
               </div>
             </div>
             <div className="flex items-center gap-4">
+              {/* Persistent return to UALE — only for UALE-launched sessions. */}
+              <BackToUale launchedFromUale={fromUale} tone="light" />
               {/* Save confidence — calm, non-nagging; also states progress is device-local. */}
               <span className={'hidden sm:flex items-center gap-1.5 text-xs ' + (saveState === 'error' ? 'text-rose-600' : saveState === 'saving' ? 'text-uale-faint' : 'text-uale-sec')}>
                 {saveState === 'saving'

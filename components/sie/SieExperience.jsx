@@ -19,7 +19,8 @@ import { familyLabel, familyOf } from '../../lib/certifications/sie/families.mjs
 import { recurringMisconceptions, misconceptionPhrase } from '../../lib/misconceptions.mjs';
 import { loadSieState, saveSieState, recordSieAnswer } from '../../lib/certifications/sie/sieStore.mjs';
 
-const UALE_HOME = 'https://florence-sand-phi.vercel.app/';
+import ExternalModuleShell from '../ExternalModuleShell';
+import { noteUaleLaunch, launchedFromUale as detectLaunchedFromUale } from '../../lib/ualeSession.mjs';
 function rngFrom(seed) { let s = (seed >>> 0) || 1; return () => { s = (Math.imul(s, 1103515245) + 12345) & 0x7fffffff; return s / 0x7fffffff; }; }
 function shuffle(a) { const r = [...a]; for (let i = r.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [r[i], r[j]] = [r[j], r[i]]; } return r; }
 function seed() { return (Math.floor((typeof performance !== 'undefined' ? performance.now() : 1) * 1000) % 2147483647) || 7; }
@@ -31,15 +32,18 @@ export default function SieExperience() {
   const [saveState, setSaveState] = useState('idle');
   const saveTimer = useRef(null);
   const learnerKeyRef = useRef(null);
+  const [fromUale, setFromUale] = useState(false); // launched from UALE → show Back to UALE
 
   useEffect(() => {
     let lid = null, nm = null;
     try {
+      noteUaleLaunch(window.location.search); // persist safe "from UALE" marker BEFORE the scrub
       const p = new URLSearchParams(window.location.search);
       lid = p.get('lid'); nm = p.get('name');
       if (/[?&](src|lid|name)=/.test(window.location.search)) window.history.replaceState({}, '', window.location.pathname);
     } catch { /* SSR */ }
     learnerKeyRef.current = lid || null;
+    setFromUale(detectLaunchedFromUale(learnerKeyRef.current));
     let s = loadSieState(learnerKeyRef.current);
     if (nm) s = { ...s, learnerName: nm.slice(0, 60) };
     setState(s);
@@ -138,19 +142,13 @@ export default function SieExperience() {
   // ============================ RENDER =========================================
   return (
     <div className="min-h-screen bg-uale-ivory text-uale-text">
-      <header className="bg-uale-hero-3 text-uale-cream">
-        <div className="max-w-4xl mx-auto px-6 py-6 flex items-center justify-between gap-3">
-          <a href={UALE_HOME} className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-uale-cream-dim hover:text-uale-cream">
-            <ArrowLeft className="w-4 h-4" /> Back to UALE
-          </a>
-          <SaveBadge />
-        </div>
-        <div className="max-w-4xl mx-auto px-6 pb-6">
-          <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-uale-champagne">UALE · Professional Certification</p>
-          <h1 className="mt-1 text-3xl font-semibold font-uale-serif">{CERT_NAME}</h1>
-          <p className="mt-1 text-[13px] text-uale-cream-dim">{PRACTICE_LABEL} — {EXAM.scoredQuestions} scored / {EXAM.totalPresented} presented, {EXAM.minutes} min, four choices. Original practice; not actual FINRA questions.</p>
-        </div>
-      </header>
+      <ExternalModuleShell
+        category="Professional Certification"
+        title={CERT_NAME}
+        subtitle={`${PRACTICE_LABEL} — ${EXAM.scoredQuestions} scored / ${EXAM.totalPresented} presented, ${EXAM.minutes} min, four choices. Original practice; not actual FINRA questions.`}
+        saveState={saveState}
+        launchedFromUale={fromUale}
+      />
 
       <main className="max-w-4xl mx-auto px-6 py-6">
         {view === 'practice' && session ? renderPractice() : renderHome()}

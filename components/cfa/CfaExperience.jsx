@@ -18,7 +18,8 @@ import { recurringMisconceptions, misconceptionPhrase } from '../../lib/certific
 // UALE is the authority for which modules a learner may access; "Back to UALE"
 // returns the learner to the capability-aware UALE home rather than trapping them in
 // this module. It is navigation only — it never grants access (UALE re-gates).
-const UALE_HOME = 'https://florence-sand-phi.vercel.app/';
+import ExternalModuleShell from '../ExternalModuleShell';
+import { noteUaleLaunch, launchedFromUale as detectLaunchedFromUale } from '../../lib/ualeSession.mjs';
 import { createStudyPlan, updateStudyPlan, recalcPlan } from '../../lib/studyPlan.mjs';
 import { PSM_OPTIONS, PSM_STATUS, selectPsm, setPsmStatus, PSM_REQUIREMENT_NOTE } from '../../lib/certifications/cfa/psm.mjs';
 import { loadCfaState, saveCfaState, recordCfaAnswer, emptyCfaState } from '../../lib/certifications/cfa/cfaStore.mjs';
@@ -34,10 +35,12 @@ export default function CfaExperience() {
   const [saveState, setSaveState] = useState('idle'); // idle | saving | saved | error
   const saveTimer = useRef(null);
   const learnerKeyRef = useRef(null); // per-learner storage key (UALE handoff lid) — no cross-learner merge
+  const [fromUale, setFromUale] = useState(false); // launched from UALE → show Back to UALE
   useEffect(() => {
     let lid = null, nm = null;
     if (typeof window !== 'undefined') {
       try {
+        noteUaleLaunch(window.location.search); // persist safe "from UALE" marker BEFORE the scrub
         const p = new URLSearchParams(window.location.search);
         lid = p.get('lid'); nm = p.get('name');
         // Strip the handoff from the URL (privacy) after reading it.
@@ -45,6 +48,7 @@ export default function CfaExperience() {
       } catch { /* ignore */ }
     }
     learnerKeyRef.current = lid || null;
+    setFromUale(detectLaunchedFromUale(learnerKeyRef.current));
     let s = loadCfaState(learnerKeyRef.current); // this learner's OWN state
     if (nm) s = { ...s, learnerName: nm.slice(0, 60) };
     setState(s);
@@ -171,26 +175,13 @@ export default function CfaExperience() {
   // ============================ RENDER =========================================
   return (
     <div className="min-h-screen bg-uale-ivory text-uale-text">
-      <header className="bg-uale-hero-3 text-uale-cream">
-        <div className="max-w-4xl mx-auto px-6 py-6">
-          <div className="flex items-center justify-between gap-3">
-            <a href={UALE_HOME} className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-uale-cream-dim hover:text-uale-cream">
-              <ArrowLeft className="w-4 h-4" /> Back to UALE
-            </a>
-            {/* Save confidence — calm; also discloses progress is device-local. */}
-            <span className={'flex items-center gap-1.5 text-xs ' + (saveState === 'error' ? 'text-rose-200' : 'text-uale-cream-dim')}>
-              {saveState === 'saving'
-                ? 'Saving…'
-                : saveState === 'error'
-                  ? 'Unable to save'
-                  : <><CheckCircle2 className="w-3.5 h-3.5" /> Progress saved on this device</>}
-            </span>
-          </div>
-          <p className="mt-4 text-xs uppercase tracking-[0.17em] text-uale-champagne">UALE · Professional Certification</p>
-          <h1 className="font-uale-serif text-3xl font-semibold mt-1">CFA Level I</h1>
-          <p className="text-sm text-uale-cream-dim mt-1">{PRACTICE_LABEL} — original items aligned to the official topic blueprint. Not affiliated with or endorsed by CFA Institute.</p>
-        </div>
-      </header>
+      <ExternalModuleShell
+        category="Professional Certification"
+        title="CFA Level I"
+        subtitle={`${PRACTICE_LABEL} — original items aligned to the official topic blueprint. Not affiliated with or endorsed by CFA Institute.`}
+        saveState={saveState}
+        launchedFromUale={fromUale}
+      />
 
       <main className="max-w-4xl mx-auto px-6 py-8">
         {view === 'practice' && session ? renderPractice() :

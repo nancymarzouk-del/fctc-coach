@@ -91,10 +91,15 @@ test('the FCTC app retains its own FCTC metadata (no cross-contamination)', () =
 });
 
 // ---- Back-to-UALE navigation (does not grant access) ----------------------------
-test('CFA provides a Back-to-UALE link to the UALE home and grants no capabilities', () => {
+test('CFA provides a Back-to-UALE link to the UALE home (via the shared shell) and grants no capabilities', () => {
   const src = read('components/cfa/CfaExperience.jsx');
-  assert.match(src, /Back to UALE/);
-  assert.match(src, /florence-sand-phi\.vercel\.app/); // returns to the capability-aware UALE home
+  // The return path now comes from the SHARED external-module shell, gated on a
+  // UALE-launched session — no per-module hardcoded URL.
+  assert.match(src, /<ExternalModuleShell[\s\S]*launchedFromUale=\{fromUale\}/);
+  assert.match(src, /from '\.\.\/\.\.\/lib\/ualeSession\.mjs'/);
+  const shell = read('components/ExternalModuleShell.jsx');
+  assert.match(shell, /Back to UALE/);
+  assert.match(read('lib/ualeSession.mjs'), /florence-sand-phi\.vercel\.app/); // returns to the UALE home
   // Navigation only — the CFA client contains no authorization/capability-granting logic.
   assert.ok(!/is_admin|hasCapability|grantCapability|beta_testers/i.test(src), 'CFA client must not implement authorization');
 });

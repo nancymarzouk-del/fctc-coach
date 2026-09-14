@@ -87,11 +87,14 @@ test('CfaExperience surfaces the trend chip only when the engine reports a direc
 
 test('CFA surfaces save confidence, welcome-back/resume, and transfer status', () => {
   const c = cmp();
-  // Save confidence (device-local) — no manual Save button.
-  assert.match(c, /Progress saved on this device/);
-  assert.match(c, /Saving…/);
-  assert.match(c, /Unable to save/);
+  // Save confidence (device-local) — now rendered by the SHARED external-module shell,
+  // which CFA drives by passing its saveState. No manual Save button.
+  assert.match(c, /<ExternalModuleShell[\s\S]*saveState=\{saveState\}/);
   assert.match(c, /const \[saveState, setSaveState\]/);
+  const shell = readFileSync(resolve(ROOT, 'components/ExternalModuleShell.jsx'), 'utf8');
+  assert.match(shell, /Progress saved on this device/);
+  assert.match(shell, /Saving…/);
+  assert.match(shell, /Unable to save/);
   // Welcome-back + resume.
   assert.match(c, /Welcome back/);
   assert.match(c, /continueLast/);

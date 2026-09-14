@@ -20,8 +20,9 @@ import { loadTmState, saveTmState, recordTmAnswer } from '../../lib/certificatio
 import { loadLearnState, isFreshLearner } from '../../lib/certifications/tm/tmLearnStore.mjs';
 import TmApplication from './TmApplication';
 import TmLearn from './TmLearn';
+import ExternalModuleShell from '../ExternalModuleShell';
+import { noteUaleLaunch, launchedFromUale as detectLaunchedFromUale } from '../../lib/ualeSession.mjs';
 
-const UALE_HOME = 'https://florence-sand-phi.vercel.app/';
 function rngFrom(seed) { let s = (seed >>> 0) || 1; return () => { s = (Math.imul(s, 1103515245) + 12345) & 0x7fffffff; return s / 0x7fffffff; }; }
 function shuffle(a) { const r = [...a]; for (let i = r.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [r[i], r[j]] = [r[j], r[i]]; } return r; }
 function seed() { return (Math.floor((typeof performance !== 'undefined' ? performance.now() : 1) * 1000) % 2147483647) || 7; }
@@ -33,6 +34,7 @@ export default function TimeMgmtExperience() {
   // engine), application (Plan My Day). Fresh learners default into LEARN so they
   // are never dropped straight into a question stream.
   const [mode, setMode] = useState('practice'); // learn | practice | application
+  const [fromUale, setFromUale] = useState(false); // launched from UALE → show Back to UALE
   const todayStr = useMemo(() => { try { return new Date().toISOString().slice(0, 10); } catch { return null; } }, []);
   const [session, setSession] = useState(null);
   const [saveState, setSaveState] = useState('idle');
@@ -42,11 +44,13 @@ export default function TimeMgmtExperience() {
   useEffect(() => {
     let lid = null, nm = null;
     try {
+      noteUaleLaunch(window.location.search); // persist safe "from UALE" marker BEFORE the scrub
       const p = new URLSearchParams(window.location.search);
       lid = p.get('lid'); nm = p.get('name');
       if (/[?&](src|lid|name)=/.test(window.location.search)) window.history.replaceState({}, '', window.location.pathname);
     } catch { /* SSR */ }
     learnerKeyRef.current = lid || null;
+    setFromUale(detectLaunchedFromUale(learnerKeyRef.current));
     let s = loadTmState(learnerKeyRef.current);
     if (nm) s = { ...s, learnerName: nm.slice(0, 60) };
     setState(s);
@@ -163,19 +167,13 @@ export default function TimeMgmtExperience() {
 
   return (
     <div className="min-h-screen bg-uale-ivory text-uale-text">
-      <header className="bg-uale-hero-3 text-uale-cream">
-        <div className="max-w-4xl mx-auto px-6 py-6 flex items-center justify-between gap-3">
-          <a href={UALE_HOME} className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-uale-cream-dim hover:text-uale-cream">
-            <ArrowLeft className="w-4 h-4" /> Back to UALE
-          </a>
-          <SaveBadge />
-        </div>
-        <div className="max-w-4xl mx-auto px-6 pb-6">
-          <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-uale-champagne">UALE · Personal Execution</p>
-          <h1 className="mt-1 text-3xl font-semibold font-uale-serif">{CERT_NAME}</h1>
-          <p className="mt-1 text-[13px] text-uale-cream-dim">{PRACTICE_LABEL} — you get measurably better at deciding what to do first, estimating time, and turning vague work into a next action. Scenarios across work, study, cert prep, and home.</p>
-        </div>
-      </header>
+      <ExternalModuleShell
+        category="Personal Execution"
+        title={CERT_NAME}
+        subtitle={`${PRACTICE_LABEL} — you get measurably better at deciding what to do first, estimating time, and turning vague work into a next action. Scenarios across work, study, cert prep, and home.`}
+        saveState={saveState}
+        launchedFromUale={fromUale}
+      />
 
       <main className="max-w-4xl mx-auto px-6 py-6">
         {/* Mode switch — LEARN (understand the skill), PRACTICE (adaptive evidence
