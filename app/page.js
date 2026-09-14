@@ -140,6 +140,10 @@ export default function App() {
     if (!id) return
     const s = hydrate(id)
     setUserId(id); setState(s); setUsers(storage.listUsers()); setPage('dashboard')
+    // A `uale:` profile is itself a legitimate record of a prior UALE launch, so
+    // entering it (e.g. via a "Continue as" chip) must show Back to UALE — not only
+    // when arriving via the live ?src=uale handoff.
+    setFromUale(detectLaunchedFromUale(id))
     refreshResumable(id)
   }
 
