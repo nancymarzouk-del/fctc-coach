@@ -18,7 +18,11 @@ import { recurringMisconceptions, misconceptionPhrase } from '../../lib/certific
 // UALE is the authority for which modules a learner may access; "Back to UALE"
 // returns the learner to the capability-aware UALE home rather than trapping them in
 // this module. It is navigation only — it never grants access (UALE re-gates).
-const UALE_HOME = 'https://florence-sand-phi.vercel.app/';
+import ExternalModuleShell from '../ExternalModuleShell';
+import { noteUaleLaunch, launchedFromUale as detectLaunchedFromUale } from '../../lib/ualeSession.mjs';
+import { loadActiveSession, saveActiveSession, clearActiveSession, sessionToRecord, resumeSummary, isResumable, isComplete, nextUnansweredIndex } from '../../lib/activeSession.mjs';
+
+const RESUME_MODULE = 'cfa';
 import { createStudyPlan, updateStudyPlan, recalcPlan } from '../../lib/studyPlan.mjs';
 import { PSM_OPTIONS, PSM_STATUS, selectPsm, setPsmStatus, PSM_REQUIREMENT_NOTE } from '../../lib/certifications/cfa/psm.mjs';
 import { loadCfaState, saveCfaState, recordCfaAnswer, emptyCfaState } from '../../lib/certifications/cfa/cfaStore.mjs';
@@ -34,10 +38,18 @@ export default function CfaExperience() {
   const [saveState, setSaveState] = useState('idle'); // idle | saving | saved | error
   const saveTimer = useRef(null);
   const learnerKeyRef = useRef(null); // per-learner storage key (UALE handoff lid) — no cross-learner merge
+  const [fromUale, setFromUale] = useState(false); // launched from UALE → show Back to UALE
+  const [resumable, setResumable] = useState(null); // { completed, total, label } if an incomplete session exists
+  const refreshResumable = () => {
+    const rec = loadActiveSession(RESUME_MODULE, learnerKeyRef.current);
+    if (rec && isComplete(rec)) { clearActiveSession(RESUME_MODULE, learnerKeyRef.current); setResumable(null); return; }
+    setResumable(resumeSummary(rec));
+  };
   useEffect(() => {
     let lid = null, nm = null;
     if (typeof window !== 'undefined') {
       try {
+        noteUaleLaunch(window.location.search); // persist safe "from UALE" marker BEFORE the scrub
         const p = new URLSearchParams(window.location.search);
         lid = p.get('lid'); nm = p.get('name');
         // Strip the handoff from the URL (privacy) after reading it.
@@ -45,11 +57,19 @@ export default function CfaExperience() {
       } catch { /* ignore */ }
     }
     learnerKeyRef.current = lid || null;
+    setFromUale(detectLaunchedFromUale(learnerKeyRef.current));
     let s = loadCfaState(learnerKeyRef.current); // this learner's OWN state
     if (nm) s = { ...s, learnerName: nm.slice(0, 60) };
     setState(s);
     if (s.learnerName) saveCfaState(s, learnerKeyRef.current);
+    refreshResumable(); // surface any incomplete session for this learner
   }, []);
+  // Persist the in-progress session (for resume) whenever it changes — the exact
+  // ordered queue (incl. adaptive remediation) + which items are already answered.
+  useEffect(() => {
+    if (session && session.queue) saveActiveSession(sessionToRecord(session, { module: RESUME_MODULE, learnerKey: learnerKeyRef.current, nowMs: Date.now() }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session]);
   // Autosave — and make it visible (device-local; no manual Save button). Always
   // scoped to this learner's key so different UALE learners never merge.
   const persist = (next) => {
@@ -93,7 +113,7 @@ export default function CfaExperience() {
       if (item) { q.push(item); avoid.unshift(item.concept); if (avoid.length > 8) avoid.pop(); }
     }
     if (activity) persist({ ...state, lastActivity: { ...activity, label } }); // remember for Welcome-back / Continue
-    setSession({ queue: q, idx: 0, picked: null, revealed: false, label });
+    setSession({ queue: q, idx: 0, picked: null, revealed: false, label, answers: {}, sessionType: (activity && activity.kind) || 'practice', sessionId: `${RESUME_MODULE}-${Date.now()}`, startedAt: Date.now(), targetCount: q.length });
     setView('practice');
   };
   const startTopic = (t) => {
@@ -140,12 +160,31 @@ export default function CfaExperience() {
     setSession((s) => {
       const queue = s.queue.slice();
       if (reteach) queue.splice(s.idx + 1, 0, { ...reteach, _reteach: true, _fromFamily: q.family });
-      return { ...s, queue, revealed: true, steppedUp: correct && after > before };
+      // Record the submitted answer at this index (evidence already written above; this
+      // is only for resume bookkeeping and is idempotent).
+      const answers = { ...(s.answers || {}), [s.idx]: { picked: s.picked, correct } };
+      return { ...s, queue, answers, revealed: true, steppedUp: correct && after > before };
     });
   };
   const next = () => {
-    if (session.idx + 1 >= session.queue.length) { setSession(null); setView('home'); return; }
+    if (session.idx + 1 >= session.queue.length) {
+      clearActiveSession(RESUME_MODULE, learnerKeyRef.current); // session finished → nothing to resume
+      setResumable(null); setSession(null); setView('home'); return;
+    }
     setSession((s) => ({ ...s, idx: s.idx + 1, picked: null, revealed: false, steppedUp: false }));
+  };
+  // ---- resume / start over (shared incomplete-session behavior) ------------------
+  const resumeSession = () => {
+    const rec = loadActiveSession(RESUME_MODULE, learnerKeyRef.current);
+    if (!rec || !isResumable(rec)) { refreshResumable(); return; }
+    const idx = nextUnansweredIndex(rec); // continue at the next UNANSWERED item — never restart at 1
+    setSession({ queue: rec.queue, idx, picked: null, revealed: false, label: rec.label, answers: rec.answers, sessionType: rec.sessionType, sessionId: rec.sessionId, startedAt: rec.startedAt, targetCount: rec.targetCount });
+    setView('practice');
+  };
+  const restartSession = () => {
+    clearActiveSession(RESUME_MODULE, learnerKeyRef.current); // archive the incomplete one (evidence untouched)
+    setResumable(null);
+    continueLast(); // regenerate a FRESH session of the same kind (topic/mixed/diagnostic)
   };
 
   // ---- study plan ---------------------------------------------------------------
@@ -171,26 +210,13 @@ export default function CfaExperience() {
   // ============================ RENDER =========================================
   return (
     <div className="min-h-screen bg-uale-ivory text-uale-text">
-      <header className="bg-uale-hero-3 text-uale-cream">
-        <div className="max-w-4xl mx-auto px-6 py-6">
-          <div className="flex items-center justify-between gap-3">
-            <a href={UALE_HOME} className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-uale-cream-dim hover:text-uale-cream">
-              <ArrowLeft className="w-4 h-4" /> Back to UALE
-            </a>
-            {/* Save confidence — calm; also discloses progress is device-local. */}
-            <span className={'flex items-center gap-1.5 text-xs ' + (saveState === 'error' ? 'text-rose-200' : 'text-uale-cream-dim')}>
-              {saveState === 'saving'
-                ? 'Saving…'
-                : saveState === 'error'
-                  ? 'Unable to save'
-                  : <><CheckCircle2 className="w-3.5 h-3.5" /> Progress saved on this device</>}
-            </span>
-          </div>
-          <p className="mt-4 text-xs uppercase tracking-[0.17em] text-uale-champagne">UALE · Professional Certification</p>
-          <h1 className="font-uale-serif text-3xl font-semibold mt-1">CFA Level I</h1>
-          <p className="text-sm text-uale-cream-dim mt-1">{PRACTICE_LABEL} — original items aligned to the official topic blueprint. Not affiliated with or endorsed by CFA Institute.</p>
-        </div>
-      </header>
+      <ExternalModuleShell
+        category="Professional Certification"
+        title="CFA Level I"
+        subtitle={`${PRACTICE_LABEL} — original items aligned to the official topic blueprint. Not affiliated with or endorsed by CFA Institute.`}
+        saveState={saveState}
+        launchedFromUale={fromUale}
+      />
 
       <main className="max-w-4xl mx-auto px-6 py-8">
         {view === 'practice' && session ? renderPractice() :
@@ -204,8 +230,20 @@ export default function CfaExperience() {
   function renderHome() {
     return (
       <>
+        {/* Resume an incomplete session — the exact same items at the next unanswered one. */}
+        {resumable && (
+          <section className="mb-4 rounded-2xl border border-uale-brass-lite bg-uale-brass-soft p-5">
+            <p className="text-[11px] font-bold uppercase tracking-[0.15em] text-uale-brass-2">Continue where you left off</p>
+            <p className="mt-1 font-uale-serif text-[1.2rem] font-semibold text-uale-ink">{resumable.label || 'Practice session'}</p>
+            <p className="mt-0.5 text-[13px] text-uale-sec">{resumable.completed} of {resumable.total} completed</p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button onClick={resumeSession} className={btn}>Continue <ArrowRight className="w-4 h-4" /></button>
+              <button onClick={restartSession} className="inline-flex items-center gap-1.5 rounded-lg border border-uale-stone-300 bg-uale-card px-4 py-2 text-[13px] font-semibold text-uale-ink-2 hover:border-uale-stone-400">Start over</button>
+            </div>
+          </section>
+        )}
         {/* Welcome back / resume — the return state. */}
-        {state.lastActivity && (
+        {state.lastActivity && !resumable && (
           <section className="mb-4">
             <p className="font-uale-serif text-[1.3rem] font-semibold text-uale-ink [text-wrap:pretty]">
               Welcome back{state.learnerName ? `, ${state.learnerName}` : ''} — pick up where you left off.

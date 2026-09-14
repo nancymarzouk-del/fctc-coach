@@ -19,6 +19,11 @@ import MockExam from '../components/MockExam'
 import RecallBoard from '../components/RecallBoard'
 import { classifyRecallDetail, recallStrategy, recordRecallMiss, focusDetailType, detailTypeToBoardKind } from '../lib/recallCoach'
 import { parseUaleHandoff } from '../lib/ualeHandoff.mjs'
+import { BackToUale } from '../components/ExternalModuleShell'
+import { noteUaleLaunch, launchedFromUale as detectLaunchedFromUale } from '../lib/ualeSession.mjs'
+import { loadActiveSession, saveActiveSession, clearActiveSession, resumeSummary, isResumable, isComplete, nextUnansweredIndex } from '../lib/activeSession.mjs'
+
+const RESUME_MODULE = 'fctc'
 
 const DOMAIN_ICONS = { mechanical: Wrench, math: TrendingUp, reading: BookOpen, recall: Eye }
 // One calm, UALE-consistent chrome treatment for every domain — identity comes
@@ -58,7 +63,16 @@ export default function App() {
   const [users, setUsers] = useState([])
   const [state, setState] = useState(null)
   const [saveState, setSaveState] = useState('idle') // idle | saving | saved | error — learner save confidence
+  const [fromUale, setFromUale] = useState(false)    // launched from UALE → show Back to UALE
+  const [resumable, setResumable] = useState(null)   // incomplete question session, if any
+  const sessionMetaRef = useRef(null)                // { sessionType, sessionId, startedAt } for the active session
   const saveTimer = useRef(null)
+  const refreshResumable = (key) => {
+    const k = key !== undefined ? key : userId
+    const rec = loadActiveSession(RESUME_MODULE, k)
+    if (rec && isComplete(rec)) { clearActiveSession(RESUME_MODULE, k); setResumable(null); return }
+    setResumable(resumeSummary(rec))
+  }
 
   const [queue, setQueue] = useState([])
   const [qIndex, setQIndex] = useState(0)
@@ -77,6 +91,7 @@ export default function App() {
   // profile and skip the name screen (and strip the handoff from the URL so the key
   // isn't left in the address bar/history). Otherwise show the normal profile list.
   useEffect(() => {
+    if (typeof window !== 'undefined') noteUaleLaunch(window.location.search) // persist safe "from UALE" marker BEFORE the scrub
     const h = typeof window !== 'undefined' ? parseUaleHandoff(window.location.search) : null
     if (h) {
       enterAsUale(h.profileId, h.displayName)
@@ -84,6 +99,7 @@ export default function App() {
     } else {
       setUsers(storage.listUsers())
     }
+    setFromUale(detectLaunchedFromUale(h ? h.profileId : null))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -124,6 +140,7 @@ export default function App() {
     if (!id) return
     const s = hydrate(id)
     setUserId(id); setState(s); setUsers(storage.listUsers()); setPage('dashboard')
+    refreshResumable(id)
   }
 
   // Enter directly from a UALE launch — no profile-name step. `id` is the learner-
@@ -135,11 +152,12 @@ export default function App() {
     s.viaUale = true
     storage.save(id, s)
     setUserId(id); setState(s); setUsers(storage.listUsers()); setPage('dashboard')
+    refreshResumable(id)
   }
 
-  const logout = () => { setUserId(''); setNameInput(''); setState(null); setPage('login') }
+  const logout = () => { setUserId(''); setNameInput(''); setState(null); setResumable(null); setPage('login') }
 
-  const startSession = (plan, label) => {
+  const startSession = (plan, label, sessionType = 'practice') => {
     const rng = makeRng(Date.now())
     const qs = plan.map(p => {
       const q = questionProvider.generate({
@@ -149,11 +167,12 @@ export default function App() {
       // session can render guided worked-examples vs. graded transfer questions.
       return q ? { ...q, mode: p.mode || 'graded', guidance: p.guidance || null } : null
     }).filter(Boolean)
+    sessionMetaRef.current = { sessionType, sessionId: `${RESUME_MODULE}-${Date.now()}`, startedAt: Date.now() }
     setQueue(qs); setQIndex(0); setSelected(null); setRevealed(false)
     setSessionLog([]); setSessionLabel(label); setPage('session')
   }
 
-  const startTargeted = () => { noteActivity({ kind: 'targeted', label: 'Targeted Practice' }); startSession(buildTargetedSession(state, 10), 'Targeted Practice') }
+  const startTargeted = () => { noteActivity({ kind: 'targeted', label: 'Targeted Practice' }); startSession(buildTargetedSession(state, 10), 'Targeted Practice', 'targeted') }
 
   // Repeated misses in a mechanical subskill → a guided remediation ladder
   // (worked example → progressively harder transfer). Falls back to targeted
@@ -161,7 +180,7 @@ export default function App() {
   const startNextBestAction = () => {
     const a = nextBestAction(state)
     if (a && a.domain === 'mechanical' && a.subskill && (a.kind === 'weak' || a.kind === 'build')) {
-      startSession(buildRemediationSession(state, a.domain, a.subskill), 'Guided Practice')
+      startSession(buildRemediationSession(state, a.domain, a.subskill), 'Guided Practice', 'guided')
     } else {
       startTargeted()
     }
@@ -188,7 +207,7 @@ export default function App() {
       const sk = subs[i % subs.length]
       return { domain, subskill: sk, difficulty: state.domains[domain][sk].difficulty }
     })
-    startSession(plan, SUBSKILLS[domain].label)
+    startSession(plan, SUBSKILLS[domain].label, 'domain')
   }
 
   const startDiagnostic = () => {
@@ -198,8 +217,36 @@ export default function App() {
       const subs = Object.keys(SUBSKILLS[d].subskills)
       for (let i = 0; i < 2; i++) plan.push({ domain: d, subskill: subs[i % subs.length], difficulty: 2 })
     }
-    startSession(plan, 'Diagnostic')
+    startSession(plan, 'Diagnostic', 'diagnostic')
   }
+
+  // Persist the in-progress FCTC session (for resume): the exact generated queue +
+  // the answered log, so evidence is never re-recorded and the session restores exactly.
+  useEffect(() => {
+    if (page !== 'session' || !queue.length || !sessionMetaRef.current) return
+    const meta = sessionMetaRef.current
+    const answers = {}
+    sessionLog.forEach((entry, i) => { answers[i] = { correct: !!entry.correct } })
+    saveActiveSession({
+      schemaVersion: 1, module: RESUME_MODULE, learnerKey: userId || null,
+      sessionType: meta.sessionType, sessionId: meta.sessionId, label: sessionLabel,
+      queue, answers, idx: qIndex, targetCount: queue.length,
+      startedAt: meta.startedAt, lastUpdatedAt: Date.now(), status: 'in-progress',
+      extra: { sessionLog },
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [queue, qIndex, sessionLog, page])
+
+  // Resume the exact incomplete session at the next unanswered question.
+  const resumeSession = () => {
+    const rec = loadActiveSession(RESUME_MODULE, userId)
+    if (!rec || !isResumable(rec)) { refreshResumable(); return }
+    const idx = nextUnansweredIndex(rec)
+    sessionMetaRef.current = { sessionType: rec.sessionType, sessionId: rec.sessionId, startedAt: rec.startedAt }
+    setQueue(rec.queue); setQIndex(idx); setSelected(null); setRevealed(false)
+    setSessionLog((rec.extra && rec.extra.sessionLog) || []); setSessionLabel(rec.label); setPage('session')
+  }
+  const restartSession = () => { clearActiveSession(RESUME_MODULE, userId); setResumable(null); continueActivity() }
 
   const answer = (idx) => {
     if (revealed) return
@@ -222,6 +269,7 @@ export default function App() {
       endSession(next)
       commitSessionStats(next, sessionLog)  // roll results into category stats
       persist(next)
+      clearActiveSession(RESUME_MODULE, userId); setResumable(null) // finished → nothing to resume
       setPage('results')
     }
   }
@@ -391,11 +439,14 @@ export default function App() {
             <div className="flex items-center gap-3">
               <div className="w-9 h-9 rounded-xl bg-uale-brass-soft border border-uale-stone-200 grid place-items-center"><Flame className="w-4 h-4 text-uale-brass-2" /></div>
               <div>
+                <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-uale-brass-2">UALE</p>
                 <p className="font-uale-serif text-[17px] font-semibold leading-tight text-uale-ink">FCTC</p>
                 <p className="text-uale-sec text-xs">Firefighter Written Test Prep · {state?.displayName || userId}</p>
               </div>
             </div>
             <div className="flex items-center gap-4">
+              {/* Persistent return to UALE — only for UALE-launched sessions. */}
+              <BackToUale launchedFromUale={fromUale} tone="light" />
               {/* Save confidence — calm, non-nagging; also states progress is device-local. */}
               <span className={'hidden sm:flex items-center gap-1.5 text-xs ' + (saveState === 'error' ? 'text-rose-600' : saveState === 'saving' ? 'text-uale-faint' : 'text-uale-sec')}>
                 {saveState === 'saving'
@@ -412,7 +463,19 @@ export default function App() {
         </header>
 
         <main className="max-w-5xl mx-auto px-6 py-8">
-          {cont && !fresh && (
+          {/* Resume an incomplete question session — the exact same questions at the next unanswered one. */}
+          {resumable && (
+            <section className="mb-4 rounded-2xl border border-uale-brass-lite bg-uale-brass-soft p-5">
+              <p className="text-[11px] font-bold uppercase tracking-[0.15em] text-uale-brass-2">Continue where you left off</p>
+              <p className="mt-1 font-uale-serif text-[1.2rem] font-semibold text-uale-ink">{resumable.label || 'Practice session'}</p>
+              <p className="mt-0.5 text-[13px] text-uale-sec">{resumable.completed} of {resumable.total} completed</p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button onClick={resumeSession} className={BTN_PRIMARY}><PlayCircle className="w-4 h-4" /> Continue</button>
+                <button onClick={restartSession} className={BTN_SECONDARY}><RotateCcw className="w-4 h-4" /> Start over</button>
+              </div>
+            </section>
+          )}
+          {cont && !fresh && !resumable && (
             <p className="mb-3 font-uale-serif text-[1.35rem] font-semibold text-uale-ink [text-wrap:pretty]">
               Welcome back, {state?.displayName || userId} — pick up where you left off.
             </p>
